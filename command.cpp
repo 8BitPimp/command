@@ -1,25 +1,9 @@
 #include <cassert>
 #include <limits.h>
 
-
 #include "command.h"
 
 namespace {
-static bool intersect(const char* cmd,
-    std::string& in_out)
-{
-    for (int i = 0;; ++i) {
-        if (cmd[i] == '\0') {
-            break;
-        }
-        if (cmd[i] != in_out[i]) {
-            in_out = std::string(cmd, cmd + i);
-            break;
-        }
-    }
-    return true;
-}
-
 // substring match (return match length, or -1 if different)
 static int32_t str_match(const char* str,
     const char* sub)
@@ -31,8 +15,7 @@ static int32_t str_match(const char* str,
             if (str[i] == sub[i]) {
                 // perfect match
                 return INT_MAX;
-            }
-            else {
+            } else {
                 // substring too long
                 return -1;
             }
@@ -51,7 +34,7 @@ static int32_t str_match(const char* str,
 // find a list of matching commands
 static bool find_matches(cmd_list_t& list,
     const char* sub,
-    std::vector<command_t*>& vec)
+    std::vector<cmd_t*>& vec)
 {
     assert(sub);
     int32_t score = 0;
@@ -61,11 +44,9 @@ static bool find_matches(cmd_list_t& list,
             vec.clear();
             vec.push_back(item.get());
             score = val;
-        }
-        else if (val == score) {
+        } else if (val == score) {
             vec.push_back(item.get());
-        }
-        else {
+        } else {
             // drop on the floor
         }
     }
@@ -89,8 +70,7 @@ static size_t tokenize(const char* in,
             for (; *src == ' '; ++src)
                 ;
             start = src;
-        }
-        else {
+        } else {
             ++src;
         }
     }
@@ -104,22 +84,22 @@ static size_t tokenize(const char* in,
 }
 } // namespace
 
-
-int cmd_levenshtein(const char *s1, const char *s2) {
+int cmd_levenshtein(const char* s1, const char* s2)
+{
 #define MIN3(a, b, c) ((a) < (b) ? ((a) < (c) ? (a) : (c)) : ((b) < (c) ? (b) : (c)))
     uint32_t x, y, lastdiag, olddiag;
     const size_t s1len = strlen(s1);
     const size_t s2len = strlen(s2);
-    uint32_t * column = (uint32_t*)alloca((s1len+1)*sizeof(uint32_t));
+    uint32_t* column = (uint32_t*)alloca((s1len + 1) * sizeof(uint32_t));
     for (y = 1; y <= s1len; y++)
         column[y] = y;
     for (x = 1; x <= s2len; x++) {
         column[0] = x;
-        for (y = 1, lastdiag = x-1; y <= s1len; y++) {
+        for (y = 1, lastdiag = x - 1; y <= s1len; y++) {
             olddiag = column[y];
             column[y] = MIN3(column[y] + 1,
-                             column[y-1] + 1,
-                             lastdiag + (s1[y-1] == s2[x-1] ? 0 : 1));
+                column[y - 1] + 1,
+                lastdiag + (s1[y - 1] == s2[x - 1] ? 0 : 1));
             lastdiag = olddiag;
         }
     }
@@ -127,51 +107,48 @@ int cmd_levenshtein(const char *s1, const char *s2) {
 #undef MIN3
 }
 
-bool command_parser_t::execute(const std::string& expr, cmd_output_t & out)
+bool cmd_parser_t::execute(const std::string& expr, cmd_output_t& out)
 {
+    const std::string prev_cmd = last_cmd();
+
     // add to history buffer
     history_.push_back(expr);
     // tokenize command string
     cmd_tokens_t tokens;
     if (tokenize(expr.c_str(), tokens) == 0) {
-        if (!last_cmd_.empty()) {
-            return execute(last_cmd_, out);
-        }
-        else {
+        if (!last_cmd().empty()) {
+            return execute(prev_cmd, out);
+        } else {
             // no commands entered
             return false;
         }
     }
-    last_cmd_ = expr;
-    //
+
     cmd_list_t* list = &sub_;
-    std::vector<command_t*> cmd_vec;
+    std::vector<cmd_t*> cmd_vec;
 
     // check for aliases
-    command_t* cmd = alias_find(tokens.front());
+    cmd_t* cmd = alias_find(tokens.front());
     if (cmd) {
         tokens.pop();
-    }
-    else {
+    } else {
         while (!tokens.empty()) {
             // find best matching sub command
             cmd_vec.clear();
             find_matches(*list, tokens.front().c_str(), cmd_vec);
-            if (cmd_vec.size()==0) {
+            if (cmd_vec.size() == 0) {
                 // no sub commands to match
                 break;
-            }
-            else if (cmd_vec.size()==1) {
+            } else if (cmd_vec.size() == 1) {
                 cmd = cmd_vec.front();
                 list = &cmd->sub_;
                 // remove front item
                 tokens.pop();
-            }
-            else {
+            } else {
                 // ambiguous matches
                 cmd = nullptr;
                 out.println("  possible completions:");
-                for (auto c:cmd_vec) {
+                for (auto c : cmd_vec) {
                     out.println("    %s", c->name_);
                 }
                 break;
@@ -182,33 +159,7 @@ bool command_parser_t::execute(const std::string& expr, cmd_output_t & out)
     return cmd ? cmd->on_execute(tokens, out) : false;
 }
 
-bool command_parser_t::auto_complete(std::string& in_out)
-{
-    // todo munch sub commands
-
-    std::vector<command_t*> vec;
-    find_matches(sub_, in_out.c_str(), vec);
-    if (vec.size() == 0) {
-        return false;
-    }
-    if (vec.size() == 1) {
-        // single match
-        in_out = vec[0]->name_;
-        return true;
-    }
-    else {
-        // intersection of all
-        in_out = vec[0]->name_;
-        for (const command_t* item : vec) {
-            const char* name = item->name_;
-            assert(name);
-            intersect(name, in_out);
-        }
-    }
-    return false;
-}
-
-bool command_parser_t::find(const std::string& expr,
+bool cmd_parser_t::find(const std::string& expr,
     std::vector<std::string>& out)
 {
     (void)expr;
@@ -216,30 +167,31 @@ bool command_parser_t::find(const std::string& expr,
     return false;
 }
 
-bool command_parser_t::alias_add(command_t * cmd, const std::string & alias) {
-    assert(cmd);
+bool cmd_parser_t::alias_add(cmd_t* cmd, const std::string& alias)
+{
+    assert(cmd && !alias.empty());
     alias_[alias] = cmd;
     return true;
 }
 
-bool command_parser_t::alias_remove(const std::string & alias) {
+bool cmd_parser_t::alias_remove(const std::string& alias)
+{
     auto itt = alias_.find(alias);
     if (itt != alias_.end()) {
         alias_.erase(itt);
         return true;
-    }
-    else {
+    } else {
         return false;
     }
 }
 
-bool command_parser_t::alias_remove(const command_t * cmd) {
-    for (auto itt = alias_.begin(); itt!=alias_.end();) {
+bool cmd_parser_t::alias_remove(const cmd_t* cmd)
+{
+    for (auto itt = alias_.begin(); itt != alias_.end();) {
         assert(itt->second);
         if (itt->second == cmd) {
             itt = alias_.erase(itt);
-        }
-        else {
+        } else {
             ++itt;
         }
     }

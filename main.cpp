@@ -1,6 +1,6 @@
 #include <array>
 
-#include "command.h"
+#include "cmd.h"
 
 struct cmd_exit_t : public cmd_t {
     cmd_exit_t(cmd_parser_t& parser, cmd_baton_t user)

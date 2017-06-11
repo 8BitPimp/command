@@ -1,7 +1,7 @@
 #include <cassert>
 #include <limits.h>
 
-#include "command.h"
+#include "cmd.h"
 
 namespace {
 // substring match (return match length, or -1 if different)

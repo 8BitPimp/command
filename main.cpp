@@ -4,6 +4,7 @@
 #include "cmd_alias.h"
 #include "cmd_echo.h"
 #include "cmd_help.h"
+#include "cmd_expr.h"
 
 struct cmd_exit_t : public cmd_t {
     cmd_exit_t(cmd_parser_t& parser, cmd_baton_t user)
@@ -29,6 +30,7 @@ int main(const int argc, const char** args)
     parser.add_command<cmd_help_t>();
     parser.add_command<cmd_alias_t>();
     parser.add_command<cmd_echo_t>();
+    parser.add_command<cmd_expr_t>();
 
     printf("> ");
     while (fgets(buffer.data(), buffer.size(), stdin)) {

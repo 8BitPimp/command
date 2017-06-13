@@ -37,6 +37,13 @@ struct cmd_echo_t : public cmd_t {
             }
             out.eol();
         }
+        if (!tok.raw().empty()) {
+            out.print("   raw: ");
+            for (const cmd_token_t& token : tok.raw()) {
+                out.print("%s ", token.c_str());
+            }
+            out.eol();
+        }
         return true;
     }
 };

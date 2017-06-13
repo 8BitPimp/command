@@ -8,9 +8,10 @@ struct cmd_expr_t : public cmd_t {
     {
     }
 
-    bool get_expr(const cmd_tokens_t & tok, std::string & out) {
+    bool get_expr(const cmd_tokens_t& tok, std::string& out)
+    {
         out.clear();
-        for (const cmd_token_t &token:tok.raw()) {
+        for (const cmd_token_t& token : tok.raw()) {
             out.append(token.get());
             out.append(1, ' ');
         }
@@ -22,8 +23,7 @@ struct cmd_expr_t : public cmd_t {
         std::string expr;
         if (!get_expr(tok, expr)) {
             return error(out, "  malformed expression");
-        }
-        else {
+        } else {
             out.println("  parsing: '%s'", expr.c_str());
         }
 

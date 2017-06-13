@@ -9,7 +9,6 @@
 #include <vector>
 
 typedef std::vector<std::unique_ptr<struct cmd_t>> cmd_list_t;
-
 typedef void* cmd_baton_t;
 
 struct cmd_output_t {
@@ -75,9 +74,13 @@ struct cmd_token_t {
     template <typename type_t>
     bool get(type_t& out) const
     {
-        const int base = (token_.find("0x") == 0) ? 16 : 10;
-        out = static_cast<type_t>(strtoll(token_.c_str(), nullptr, base));
-        return errno != ERANGE;
+        bool neg = false;
+        uint64_t value = 0;
+        if (!strtoll(token_.c_str(), value, neg)) {
+            return false;
+        }
+        out = static_cast<type_t>(neg ? -value : value);
+        return true;
     }
 
     bool operator==(const cmd_token_t& rhs) const
@@ -102,6 +105,8 @@ struct cmd_token_t {
     }
 
 protected:
+    static bool strtoll(const char* in, uint64_t& out, bool& neg);
+
     std::string token_;
 };
 
@@ -295,13 +300,13 @@ struct cmd_t {
         std::string path;
         get_command_path(path);
         out.print("  usage: %s %s", path.c_str(), usage_ ? usage_ : "");
-        if (!usage_) {
-            out.eol();
-        }
+        out.eol();
         return usage_ != nullptr;
     }
 
 protected:
+    bool alias_add(const std::string& name);
+
     bool error(cmd_output_t& out, const char* fmt, ...)
     {
         va_list args;

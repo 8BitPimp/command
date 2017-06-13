@@ -240,3 +240,39 @@ bool cmd_t::on_execute(cmd_tokens_t& tok, cmd_output_t& out)
     }
     return true;
 };
+
+bool cmd_t::alias_add(const std::string& name)
+{
+    return parser_.alias_add(this, name);
+}
+
+bool cmd_token_t::strtoll(const char* in, uint64_t& out, bool& neg)
+{
+    neg = false;
+    if (*in == '-') {
+        neg = true;
+        ++in;
+    }
+    uint32_t base = 10;
+    if (memcmp(in, "0x", 2) == 0) {
+        base = 16;
+        in += 2;
+    }
+    uint64_t accum = 0;
+    for (; *in != '\0'; ++in) {
+        accum *= base;
+        const uint8_t ch = *in;
+        if (ch >= '0' && ch <= '9') {
+            accum += ch - '0';
+        } else if (base == 16) {
+            if (ch >= 'a' && ch <= 'f') {
+                accum += (ch - 'a') + 10;
+            } else if (ch >= 'A' && ch <= 'F') {
+                accum += (ch - 'A') + 10;
+            }
+        } else {
+            return (*in == ' ');
+        }
+    }
+    return out = accum, true;
+}

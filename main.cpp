@@ -3,8 +3,8 @@
 #include "cmd.h"
 #include "cmd_alias.h"
 #include "cmd_echo.h"
-#include "cmd_help.h"
 #include "cmd_expr.h"
+#include "cmd_help.h"
 
 struct cmd_exit_t : public cmd_t {
     cmd_exit_t(cmd_parser_t& parser, cmd_baton_t user)

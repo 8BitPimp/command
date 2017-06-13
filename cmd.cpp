@@ -131,14 +131,14 @@ bool cmd_parser_t::execute(const std::string& expr, cmd_output_t& out)
     std::vector<cmd_t*> cmd_vec;
 
     // check for aliases
-    cmd_t* cmd = alias_find(tokens.front());
+    cmd_t* cmd = alias_find(tokens.token_front());
     if (cmd) {
         tokens.token_pop();
     } else {
-        while (!tokens.empty()) {
+        while (!tokens.token_empty()) {
             // find best matching sub command
             cmd_vec.clear();
-            find_matches(*list, tokens.front().c_str(), cmd_vec);
+            find_matches(*list, tokens.token_front().c_str(), cmd_vec);
             if (cmd_vec.size() == 0) {
                 // no sub commands to match
                 break;
@@ -166,6 +166,8 @@ bool cmd_parser_t::execute(const std::string& expr, cmd_output_t& out)
             }
         }
         return cmd->on_execute(tokens, out);
+    } else {
+        out.println("  invalid command");
     }
     return false;
 }
@@ -217,12 +219,12 @@ bool cmd_t::on_execute(cmd_tokens_t& tok, cmd_output_t& out)
         // an empty terminal cmd is a bit weird
         return false;
     }
-    const bool have_tokens = !tok.empty();
+    const bool have_tokens = !tok.token_empty();
     if (have_tokens) {
-        const char* tok_front = tok.front().c_str();
+        const char* tok_front = tok.token_front().c_str();
         std::vector<cmd_t*> list;
         for (const auto& i : sub_) {
-            if (cmd_parser_t::levenshtein(i->name_, tok.front().c_str()) < FUZZYNESS) {
+            if (cmd_parser_t::levenshtein(i->name_, tok.token_front().c_str()) < FUZZYNESS) {
                 list.push_back(i.get());
             }
         }

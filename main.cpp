@@ -12,7 +12,7 @@ struct cmd_exit_t : public cmd_t {
         usage_ = "\n    Exit the program.";
     }
 
-    bool on_execute(const cmd_tokens_t& tok, cmd_output_t& out)
+    bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
     {
         exit(0);
         return false;

@@ -80,6 +80,11 @@ struct cmd_token_t {
         return errno != ERANGE;
     }
 
+    bool operator==(const cmd_token_t& rhs) const
+    {
+        return token_ == rhs.get();
+    }
+
     template <typename type_t>
     bool operator==(const type_t& rhs) const
     {
@@ -136,6 +141,8 @@ struct cmd_tokens_t {
             }
             return;
         }
+        /* add to raw token set */
+        raw_.push_back(input);
         /* if we have a flag or switch */
         if (input.find("-") == 0) {
             if (!stage_pair_.first.empty()) {
@@ -152,25 +159,33 @@ struct cmd_tokens_t {
         }
     }
 
-    bool empty() const
+    bool token_empty() const
     {
         return tokens_.empty();
     }
 
-    const cmd_token_t& front() const
+    const cmd_token_t& token_front() const
     {
         return tokens_.front();
     }
 
-    void token_pop()
+    bool token_pop()
     {
         if (!tokens_.empty()) {
-            tokens_.pop_front();
+            assert(!raw_.empty());
+            if (raw_.front() == tokens_.front()) {
+                // pop prefixed tokens
+                raw_.pop_front();
+                tokens_.pop_front();
+                return true;
+            }
         }
+        assert(!"FIXME: failed to pop");
+        return false;
     }
 
     /* test if a token exists */
-    bool token_has(uint32_t index) const
+    bool token_exists(uint32_t index) const
     {
         return tokens_.size() > index;
     }
@@ -180,19 +195,25 @@ struct cmd_tokens_t {
         return tokens_;
     }
 
-    const std::map<std::string, cmd_token_t> pairs() const
+    const std::map<std::string, cmd_token_t>& pairs() const
     {
         return pairs_;
     }
 
-    const std::set<std::string> flags() const
+    const std::set<std::string>& flags() const
     {
         return flags_;
     }
 
-    const bool token_find(const std::string & in) const {
-        for (const cmd_token_t & tok:tokens_) {
-            if (tok==in) {
+    const std::deque<cmd_token_t>& raw() const
+    {
+        return raw_;
+    }
+
+    const bool token_find(const std::string& in) const
+    {
+        for (const cmd_token_t& tok : tokens_) {
+            if (tok == in) {
                 return true;
             }
         }
@@ -200,6 +221,8 @@ struct cmd_tokens_t {
     }
 
 protected:
+    // raw tokens
+    std::deque<cmd_token_t> raw_;
     // staging area for pairs
     std::pair<std::string, cmd_token_t> stage_pair_;
     // basic token arguments
@@ -271,7 +294,7 @@ struct cmd_t {
     {
         std::string path;
         get_command_path(path);
-        out.print("  %s %s", path.c_str(), usage_ ? usage_ : "");
+        out.print("  usage: %s %s", path.c_str(), usage_ ? usage_ : "");
         if (!usage_) {
             out.eol();
         }
@@ -286,13 +309,6 @@ protected:
         out.println(fmt, args);
         va_end(args);
         return false;
-    }
-
-    void print_usage(cmd_output_t& out, const char* args)
-    {
-        std::string path;
-        get_command_path(path);
-        out.println("  %s [%s]", path.c_str(), args);
     }
 
     void print_cmd_list(const cmd_list_t& list, cmd_output_t& out) const

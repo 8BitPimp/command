@@ -9,7 +9,7 @@ struct cmd_alias_t : public cmd_t {
         {
         }
 
-        virtual bool on_execute(const cmd_tokens_t& tok, cmd_output_t& out)
+        virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
         {
 #if 0
             if (tok.size() < 2) {
@@ -31,7 +31,7 @@ struct cmd_alias_t : public cmd_t {
         {
         }
 
-        virtual bool on_execute(const cmd_tokens_t& tok, cmd_output_t& out)
+        virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
         {
             return false;
         }
@@ -43,7 +43,7 @@ struct cmd_alias_t : public cmd_t {
         {
         }
 
-        virtual bool on_execute(const cmd_tokens_t& tok, cmd_output_t& out)
+        virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
         {
             out.println("  %d aliases", parser_.alias_.size());
             std::string path;

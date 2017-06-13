@@ -31,7 +31,7 @@ static int32_t str_match(const char* str,
     }
 }
 
-// find a list of matching commands
+// find a list of commands that match a substring
 static bool find_matches(cmd_list_t& list,
     const char* sub,
     std::vector<cmd_t*>& vec)
@@ -79,20 +79,23 @@ static size_t tokenize(const char* in,
         // extract this token
         out.push(std::string(start, src));
     }
+    // flush tokens
+    out.push(std::string{});
     // return number of tokens
-    return out.size();
+    return out.token_size();
 }
 } // namespace
 
-int cmd_levenshtein(const char* s1, const char* s2)
+uint32_t cmd_parser_t::levenshtein(const char* s1, const char* s2)
 {
 #define MIN3(a, b, c) ((a) < (b) ? ((a) < (c) ? (a) : (c)) : ((b) < (c) ? (b) : (c)))
     uint32_t x, y, lastdiag, olddiag;
     const size_t s1len = strlen(s1);
     const size_t s2len = strlen(s2);
     uint32_t* column = (uint32_t*)alloca((s1len + 1) * sizeof(uint32_t));
-    for (y = 1; y <= s1len; y++)
+    for (y = 1; y <= s1len; y++) {
         column[y] = y;
+    }
     for (x = 1; x <= s2len; x++) {
         column[0] = x;
         for (y = 1, lastdiag = x - 1; y <= s1len; y++) {
@@ -130,7 +133,7 @@ bool cmd_parser_t::execute(const std::string& expr, cmd_output_t& out)
     // check for aliases
     cmd_t* cmd = alias_find(tokens.front());
     if (cmd) {
-        tokens.pop();
+        tokens.token_pop();
     } else {
         while (!tokens.empty()) {
             // find best matching sub command
@@ -143,7 +146,7 @@ bool cmd_parser_t::execute(const std::string& expr, cmd_output_t& out)
                 cmd = cmd_vec.front();
                 list = &cmd->sub_;
                 // remove front item
-                tokens.pop();
+                tokens.token_pop();
             } else {
                 // ambiguous matches
                 cmd = nullptr;
@@ -155,8 +158,16 @@ bool cmd_parser_t::execute(const std::string& expr, cmd_output_t& out)
             }
         }
     }
-    // execute command
-    return cmd ? cmd->on_execute(tokens, out) : false;
+    if (cmd) {
+        const auto& toks = tokens.tokens();
+        if (!toks.empty()) {
+            if (toks.rbegin()->get() == "?") {
+                return cmd->on_usage(out);
+            }
+        }
+        return cmd->on_execute(tokens, out);
+    }
+    return false;
 }
 
 bool cmd_parser_t::find(const std::string& expr,
@@ -197,3 +208,33 @@ bool cmd_parser_t::alias_remove(const cmd_t* cmd)
     }
     return true;
 }
+
+bool cmd_t::on_execute(cmd_tokens_t& tok, cmd_output_t& out)
+{
+    static const int FUZZYNESS = 3;
+    const bool have_subcomands = !sub_.empty();
+    if (!have_subcomands) {
+        // an empty terminal cmd is a bit weird
+        return false;
+    }
+    const bool have_tokens = !tok.empty();
+    if (have_tokens) {
+        const char* tok_front = tok.front().c_str();
+        std::vector<cmd_t*> list;
+        for (const auto& i : sub_) {
+            if (cmd_parser_t::levenshtein(i->name_, tok.front().c_str()) < FUZZYNESS) {
+                list.push_back(i.get());
+            }
+        }
+        out.println("  no subcommand '%s'", tok_front);
+        if (!list.empty()) {
+            out.println("  did you meen:");
+            for (cmd_t* cmd : list) {
+                out.println("    %s", cmd->name_);
+            }
+        }
+    } else {
+        print_sub_commands(out);
+    }
+    return true;
+};

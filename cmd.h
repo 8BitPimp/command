@@ -44,6 +44,12 @@ struct cmd_output_t {
         eol();
     }
 
+    void println(const char* fmt, va_list& args)
+    {
+        vfprintf(fd_, fmt, args);
+        eol();
+    }
+
     void eol()
     {
         fputc('\n', fd_);
@@ -66,26 +72,16 @@ struct cmd_token_t {
         return token_;
     }
 
-    bool get(int32_t& out) const
-    {
-        const int32_t base = (token_.find("0x") == 0) ? 16 : 10;
-        out = (int32_t)strtol(token_.c_str(), nullptr, base);
-        return errno != ERANGE;
-    }
-
-    bool get(int64_t& out) const
+    template <typename type_t>
+    bool get(type_t& out) const
     {
         const int base = (token_.find("0x") == 0) ? 16 : 10;
-        out = (int64_t)strtoll(token_.c_str(), nullptr, base);
+        out = static_cast<type_t>(strtoll(token_.c_str(), nullptr, base));
         return errno != ERANGE;
     }
 
-    bool operator==(const std::string& rhs) const
-    {
-        return token_ == rhs;
-    }
-
-    bool operator==(const char* rhs) const
+    template <typename type_t>
+    bool operator==(const type_t& rhs) const
     {
         return token_ == rhs;
     }
@@ -110,17 +106,17 @@ struct cmd_tokens_t {
     {
     }
 
-    size_t size() const
+    size_t token_size() const
     {
         return tokens_.size();
     }
 
-    bool flag(const std::string& name) const
+    bool flag_get(const std::string& name) const
     {
         return !(flags_.find(name) == flags_.end());
     }
 
-    bool pair(const std::string& name, cmd_token_t& out) const
+    bool pair_get(const std::string& name, cmd_token_t& out) const
     {
         auto itt = pairs_.find(name);
         if (itt == pairs_.end()) {
@@ -132,23 +128,27 @@ struct cmd_tokens_t {
 
     void push(const std::string& input)
     {
-        if (input.find("--") == 0) {
-            stage_pair_.first.clear();
-            flags_.insert(input);
+        /* flush when input is empty */
+        if (input.empty()) {
+            if (!stage_pair_.first.empty()) {
+                flags_.insert(stage_pair_.first);
+                stage_pair_.first.clear();
+            }
             return;
         }
+        /* if we have a flag or switch */
         if (input.find("-") == 0) {
+            if (!stage_pair_.first.empty()) {
+                flags_.insert(stage_pair_.first);
+            }
             stage_pair_.first = input;
-            return;
-        }
-        if (stage_pair_.first.empty()) {
-            tokens_.push_back(input);
-            return;
         } else {
-            stage_pair_.second = input;
-            pairs_.insert(stage_pair_);
-            stage_pair_.first.clear();
-            return;
+            if (!stage_pair_.first.empty()) {
+                pairs_[stage_pair_.first] = input;
+                stage_pair_.first.clear();
+            } else {
+                tokens_.push_back(input);
+            }
         }
     }
 
@@ -162,16 +162,41 @@ struct cmd_tokens_t {
         return tokens_.front();
     }
 
-    void pop()
+    void token_pop()
     {
         if (!tokens_.empty()) {
             tokens_.pop_front();
         }
     }
 
-    bool has(uint32_t index) const
+    /* test if a token exists */
+    bool token_has(uint32_t index) const
     {
         return tokens_.size() > index;
+    }
+
+    const std::deque<cmd_token_t>& tokens() const
+    {
+        return tokens_;
+    }
+
+    const std::map<std::string, cmd_token_t> pairs() const
+    {
+        return pairs_;
+    }
+
+    const std::set<std::string> flags() const
+    {
+        return flags_;
+    }
+
+    const bool token_find(const std::string & in) const {
+        for (const cmd_token_t & tok:tokens_) {
+            if (tok==in) {
+                return true;
+            }
+        }
+        return false;
     }
 
 protected:
@@ -186,12 +211,20 @@ protected:
 };
 
 struct cmd_t {
+    // command name
     const char* const name_;
+    // the owning command parser
     struct cmd_parser_t& parser_;
+    // user data
     cmd_baton_t user_;
+    // parent comand
     cmd_t* parent_;
+    // sub command list
     cmd_list_t sub_;
+    // command usage
+    const char* usage_;
 
+    /* mandatory constructor */
     cmd_t(const char* name,
         cmd_parser_t& parser,
         cmd_baton_t user = nullptr)
@@ -199,15 +232,19 @@ struct cmd_t {
         , parser_(parser)
         , user_(user)
         , parent_(nullptr)
+        , sub_()
+        , usage_(nullptr)
     {
     }
 
+    /* add a new subcommand */
     template <typename type_t>
     type_t* add_sub_command()
     {
         return add_sub_command<type_t>(user_);
     }
 
+    /* add a new subcommand */
     template <typename type_t>
     type_t* add_sub_command(cmd_baton_t user)
     {
@@ -217,37 +254,9 @@ struct cmd_t {
         return (type_t*)sub_.rbegin()->get();
     }
 
-    virtual bool on_execute(const cmd_tokens_t& tok, cmd_output_t& out)
-    {
-        int cmd_levenshtein(const char* s1, const char* s2);
-        static const int FUZZYNESS = 3;
-        const bool have_subcomands = !sub_.empty();
-        if (!have_subcomands) {
-            // an empty command is a bit weird
-            return false;
-        }
-        const bool have_tokens = !tok.empty();
-        if (have_tokens) {
-            const char* tok_front = tok.front().c_str();
-            std::vector<cmd_t*> list;
-            for (const auto& i : sub_) {
-                if (cmd_levenshtein(i->name_, tok.front().c_str()) < FUZZYNESS) {
-                    list.push_back(i.get());
-                }
-            }
-            out.println("  no subcommand '%s'", tok_front);
-            if (!list.empty()) {
-                out.println("  did you meen:");
-                for (cmd_t* cmd : list) {
-                    out.println("    %s", cmd->name_);
-                }
-            }
-        } else {
-            print_sub_commands(out);
-        }
-        return true;
-    };
+    virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out);
 
+    /* return hierarchy of parent commands */
     void get_command_path(std::string& out) const
     {
         if (parent_) {
@@ -257,7 +266,28 @@ struct cmd_t {
         out.append(name_);
     }
 
+    /* print command usage */
+    virtual bool on_usage(cmd_output_t& out) const
+    {
+        std::string path;
+        get_command_path(path);
+        out.print("  %s %s", path.c_str(), usage_ ? usage_ : "");
+        if (!usage_) {
+            out.eol();
+        }
+        return usage_ != nullptr;
+    }
+
 protected:
+    bool error(cmd_output_t& out, const char* fmt, ...)
+    {
+        va_list args;
+        va_start(args, fmt);
+        out.println(fmt, args);
+        va_end(args);
+        return false;
+    }
+
     void print_usage(cmd_output_t& out, const char* args)
     {
         std::string path;
@@ -295,12 +325,14 @@ struct cmd_parser_t {
         return history_.back();
     }
 
+    /* add new command */
     template <typename type_t>
     type_t* add_command()
     {
         return add_command<type_t>(user_);
     }
 
+    /* add new command */
     template <typename type_t>
     type_t* add_command(void* user)
     {
@@ -326,4 +358,6 @@ struct cmd_parser_t {
         auto itt = alias_.find(alias);
         return itt == alias_.end() ? nullptr : itt->second;
     }
+
+    static uint32_t levenshtein(const char* s1, const char* s2);
 };

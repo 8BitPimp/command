@@ -2,17 +2,19 @@
 
 #include "cmd.h"
 #include "cmd_alias.h"
+#include "cmd_echo.h"
 #include "cmd_help.h"
-
 
 struct cmd_exit_t : public cmd_t {
     cmd_exit_t(cmd_parser_t& parser, cmd_baton_t user)
         : cmd_t("exit", parser, user)
     {
+        usage_ = "\n    Exit the program.";
     }
 
     bool on_execute(const cmd_tokens_t& tok, cmd_output_t& out)
     {
+        exit(0);
         return false;
     }
 };
@@ -26,6 +28,7 @@ int main(const int argc, const char** args)
     parser.add_command<cmd_exit_t>();
     parser.add_command<cmd_help_t>();
     parser.add_command<cmd_alias_t>();
+    parser.add_command<cmd_echo_t>();
 
     printf("> ");
     while (fgets(buffer.data(), buffer.size(), stdin)) {

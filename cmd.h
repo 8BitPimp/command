@@ -104,9 +104,9 @@ struct cmd_token_t {
         return token_.c_str();
     }
 
-protected:
     static bool strtoll(const char* in, uint64_t& out, bool& neg);
 
+protected:
     std::string token_;
 };
 

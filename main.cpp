@@ -7,8 +7,8 @@
 #include "cmd_help.h"
 
 struct cmd_exit_t : public cmd_t {
-    cmd_exit_t(cmd_parser_t& parser, cmd_baton_t user)
-        : cmd_t("exit", parser, user)
+    cmd_exit_t(cmd_parser_t& parser, cmd_t* parent, cmd_baton_t user)
+        : cmd_t("exit", parser, parent, user)
     {
         usage_ = "\n    Exit the program.";
     }

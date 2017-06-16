@@ -255,11 +255,12 @@ struct cmd_t {
     /* mandatory constructor */
     cmd_t(const char* name,
         cmd_parser_t& parser,
+        cmd_t* parent,
         cmd_baton_t user = nullptr)
         : name_(name)
         , parser_(parser)
         , user_(user)
-        , parent_(nullptr)
+        , parent_(parent)
         , sub_()
         , usage_(nullptr)
     {
@@ -276,8 +277,7 @@ struct cmd_t {
     template <typename type_t>
     type_t* add_sub_command(cmd_baton_t user)
     {
-        auto temp = std::unique_ptr<type_t>(new type_t(parser_, user));
-        temp->parent_ = this;
+        auto temp = std::unique_ptr<type_t>(new type_t(parser_, this, user));
         sub_.push_back(std::move(temp));
         return (type_t*)sub_.rbegin()->get();
     }
@@ -355,9 +355,10 @@ struct cmd_parser_t {
 
     /* add new command */
     template <typename type_t>
-    type_t* add_command(void* user)
+    type_t* add_command(cmd_baton_t user)
     {
-        std::unique_ptr<type_t> temp(new type_t(*this, user));
+        cmd_t* parent = nullptr;
+        std::unique_ptr<type_t> temp(new type_t(*this, parent, user));
         sub_.push_back(std::move(temp));
         return (type_t*)sub_.rbegin()->get();
     }

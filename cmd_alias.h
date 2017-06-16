@@ -4,8 +4,8 @@
 struct cmd_alias_t : public cmd_t {
 
     struct cmd_alias_add_t : public cmd_t {
-        cmd_alias_add_t(cmd_parser_t& cli, void* user)
-            : cmd_t("add", cli, user)
+        cmd_alias_add_t(cmd_parser_t& cli, cmd_t* parent, cmd_baton_t user)
+            : cmd_t("add", cli, parent, user)
         {
             usage_ = "alias_name cmd [cmd ...]";
         }
@@ -55,8 +55,8 @@ struct cmd_alias_t : public cmd_t {
     };
 
     struct cmd_alias_remove_t : public cmd_t {
-        cmd_alias_remove_t(cmd_parser_t& cli, void* user)
-            : cmd_t("remove", cli, user)
+        cmd_alias_remove_t(cmd_parser_t& cli, cmd_t* parent, cmd_baton_t user)
+            : cmd_t("remove", cli, parent, user)
         {
         }
 
@@ -70,8 +70,8 @@ struct cmd_alias_t : public cmd_t {
     };
 
     struct cmd_alias_list_t : public cmd_t {
-        cmd_alias_list_t(cmd_parser_t& cli, void* user)
-            : cmd_t("list", cli, user)
+        cmd_alias_list_t(cmd_parser_t& cli, cmd_t* parent, cmd_baton_t user)
+            : cmd_t("list", cli, parent, user)
         {
         }
 
@@ -89,8 +89,8 @@ struct cmd_alias_t : public cmd_t {
         }
     };
 
-    cmd_alias_t(cmd_parser_t& cli, void* user)
-        : cmd_t("alias", cli, user)
+    cmd_alias_t(cmd_parser_t& cli, cmd_t* parent, cmd_baton_t user)
+        : cmd_t("alias", cli, parent, user)
     {
         add_sub_command<cmd_alias_add_t>(user);
         add_sub_command<cmd_alias_remove_t>(user);

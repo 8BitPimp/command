@@ -4,12 +4,10 @@
 struct cmd_help_t : public cmd_t {
 
     struct cmd_help_tree_t : public cmd_t {
-        cmd_help_tree_t(cmd_parser_t& cli, void* user)
-            : cmd_t("tree", cli, user)
+        cmd_help_tree_t(cmd_parser_t& cli, cmd_t* parent, cmd_baton_t user)
+            : cmd_t("tree", cli, parent, user)
         {
-            usage_ = R"(
-  list all commands and their sub commands
-)";
+            usage_ = R"(list all commands and their sub commands)";
         }
 
         void walk(const cmd_list_t& list, cmd_output_t& out, uint32_t indent)
@@ -31,12 +29,10 @@ struct cmd_help_t : public cmd_t {
         }
     };
 
-    cmd_help_t(cmd_parser_t& cli, void* user)
-        : cmd_t("help", cli, user)
+    cmd_help_t(cmd_parser_t& cli, cmd_t* parent, cmd_baton_t user)
+        : cmd_t("help", cli, parent, user)
     {
-        usage_ = R"(
-  list all commands
-)";
+        usage_ = R"(list all commands)";
         add_sub_command<cmd_help_tree_t>();
     }
 

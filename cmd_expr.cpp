@@ -5,6 +5,34 @@
 #include "cmd_expr.h"
 
 namespace {
+struct exp_token_t {
+    enum type_t {
+        e_value,
+        e_identifier,
+        e_operator,
+    };
+
+    type_t type_;
+
+    enum operator_t {
+        e_op_add,
+        e_op_sub,
+        e_op_assign,
+        e_op_mul,
+        e_op_div,
+        e_op_and,
+        e_op_or,
+        e_op_lparen,
+        e_op_rparen,
+    };
+
+    union {
+        uint64_t value_;
+        std::string * ident_;
+        operator_t op_;
+    };
+};
+
 static bool is_operator(const char ch)
 {
     switch (ch) {
@@ -130,7 +158,7 @@ protected:
     const std::string& input_peek() const
     {
         static std::string none = std::string{};
-        return input_.empty() ? input_.front() : none;
+        return input_.empty() ? none : input_.front();
     }
 
     /* return next token from input stream */
@@ -151,17 +179,17 @@ protected:
         if (input_.empty()) {
             return false;
         }
-        if (input_peek() == "(") {
-            if (!expr(0x01)) {
-                return false;
+        if (input_found("(")) {
+            if (!expr(0x0)) {
+                return error("error in parenthesis expression");
             }
             if (!input_found(")")) {
-                return false;
+                return error("unmatched parenthesis");
             }
         } else {
             std::string temp;
             if (!input_next(temp)) {
-                return false;
+                return error("unable to shift next input token");
             }
             stack_.push_back(temp);
         }
@@ -169,7 +197,7 @@ protected:
     }
 
     /* convert a string to a raw value */
-    bool value_get(const std::string& val, uint64_t& out) const
+    bool value_get(const std::string& val, uint64_t& out)
     {
         const char* tval = val.c_str();
         if (val.empty()) {
@@ -190,7 +218,7 @@ protected:
         uint64_t v = 0;
         bool neg = false;
         if (!cmd_token_t::strtoll(tval, v, neg)) {
-            return false;
+            return error("cant convert '%s' to integer", tval);
         }
         assert(neg == false);
         return out = v, true;
@@ -217,11 +245,11 @@ protected:
         return true;
     }
 
-    bool value_eval(const std::string& in, std::string& out) const
+    bool value_eval(const std::string& in, std::string& out)
     {
         uint64_t val = 0;
         if (!value_get(in, val)) {
-            return false;
+            return error("cant evaluate '%s'", in.c_str());
         }
         return value_to_hex(val, out);
     }
@@ -244,7 +272,7 @@ protected:
         // convert number to hex
         std::string temp;
         if (!value_to_hex(val, temp)) {
-            return false;
+            return error("cant convert '0x%llx' to hex", val);
         } else {
             stack_.push_back(temp);
             return true;
@@ -254,14 +282,20 @@ protected:
     /* precidence for specific operators */
     uint32_t op_prec(const std::string& op)
     {
-        if (op == "=") {
+        if (op == "(" || op == ")") {
             return 0;
         }
-        if (op == "-" || op == "+") {
+        if (op == "=") {
             return 1;
         }
-        if (op == "%" || op == "*" || op == "/") {
+        if (op == "&" || op == "|") {
             return 2;
+        }
+        if (op == "-" || op == "+") {
+            return 3;
+        }
+        if (op == "%" || op == "*" || op == "/") {
+            return 4;
         }
         /* unknown */ {
             return -1;
@@ -275,23 +309,38 @@ protected:
             return false;
         }
         if (is_ident(rhs)) {
+            // convert identifier to an rvalue
             std::string rval;
             if (!value_eval(rhs, rval)) {
-                return false;
+                return error("cant convert '%s' into rvalue", rhs.c_str());
             }
             idents_[lhs] = rval;
         } else {
+            // is already and rvalue literal so use directly
             idents_[lhs] = rhs;
         }
         stack_.push_back(lhs);
         return true;
     }
 
+    bool error(const char* fmt, ...)
+    {
+        if (error_.empty()) {
+            char temp[1024];
+            va_list ap;
+            va_start(ap, fmt);
+            vsnprintf(temp, sizeof(temp), fmt, ap);
+            va_end(ap);
+            error_.assign(temp);
+        }
+        return false;
+    }
+
     bool op_apply_generic(const char op, const std::string& lhs, const std::string& rhs)
     {
         uint64_t vlhs = 0, vrhs = 0;
         if (!value_get(lhs, vlhs) || !value_get(rhs, vrhs)) {
-            return false;
+            return error("unable to convert lhr or rhs to rvalues");
         }
         switch (op) {
         case '&':
@@ -309,7 +358,7 @@ protected:
         case '%':
             return stack_push(vlhs & vrhs), true;
         default:
-            return false;
+            return error("unknown operator '%c'", op);
         }
     }
 
@@ -320,7 +369,7 @@ protected:
         const std::string rhs = stack_pop();
         const std::string lhs = stack_pop();
         if (lhs.empty() || rhs.empty() || op_str.empty()) {
-            return false;
+            return error("expression not fully formed");
         }
         const char op = op_str[0];
         switch (op) {
@@ -336,24 +385,24 @@ protected:
     {
         // consume a literal or identifier
         if (!parse_ident()) {
-            return false;
+            return error("expecting literal or identifier");
         }
         // check for end of input
         if (input_.empty()) {
             return true;
         }
         std::string op;
-        while (op_prec(input_peek()) >= min_prec) {
+        while (op_prec(input_peek()) > min_prec) {
             // get the next operator
             if (!input_next(op)) {
-                return false;
+                return error("expecting operator");
             }
             if (!expr(op_prec(op))) {
                 return false;
             }
             // apply this operator
             if (!op_apply(op)) {
-                return false;
+                return error("unable to apply operator '%s'", op.c_str());
             }
             // if we have exhausted the input stop looping
             if (input_.empty()) {
@@ -374,11 +423,12 @@ bool cmd_expr_t::cmd_expr_eval_t::on_execute(cmd_tokens_t& tok, cmd_output_t& ou
     // execute the expression
     cmd_expr_imp_t state(expr_.idents_);
     if (!state.evaluate(expr)) {
+        out.println("  error: %s", state.error_.c_str());
         return false;
     }
     // print results
     for (const std::string& val : state.stack_) {
-        out.print("  > ");
+        out.print("  ");
         if (is_ident(val)) {
             auto& idents = state.idents_;
             auto itt = idents.find(val);
@@ -389,10 +439,10 @@ bool cmd_expr_t::cmd_expr_eval_t::on_execute(cmd_tokens_t& tok, cmd_output_t& ou
                 // print key value pair
                 const std::string& key = itt->first;
                 const std::string& value = itt->second;
-                out.println("%s : %s", key.c_str(), value.c_str());
+                out.println("  %s = %s", key.c_str(), value.c_str());
             }
         } else {
-            out.println("%s", val.c_str());
+            out.println("  %s", val.c_str());
         }
     }
     return true;

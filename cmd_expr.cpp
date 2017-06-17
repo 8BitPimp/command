@@ -516,7 +516,9 @@ protected:
                 return error("cant dereference '%s'", rhs.ident_.c_str());
             }
         }
-        assert(rhs.type_ == rhs.e_value);
+        if (rhs.type_ != rhs.e_value) {
+            return error("rhs must be an rvalue");
+        }
         // dispatch based on operator type
         switch (op.op_) {
         case '=':

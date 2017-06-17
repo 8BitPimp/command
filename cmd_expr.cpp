@@ -398,7 +398,8 @@ protected:
 #if 0
         if (!value_to_hex(val, temp)) {
             return error("cant convert '0x%llx' to hex", val);
-        } else {
+        }
+        else {
             stack_.push_back(temp);
             return true;
         }
@@ -469,7 +470,9 @@ protected:
                 return error("cant dereference '%s'", lhs.ident_.c_str());
             }
         }
-        assert(lhs.type_ == exp_token_t::e_value && rhs.type_ == exp_token_t::e_value);
+        if (lhs.type_ != exp_token_t::e_value || rhs.type_ != exp_token_t::e_value) {
+            return error("malformed expression");
+        }
         switch (op.op_) {
         case '&':
             return stack_push(lhs.value_ & rhs.value_), true;
@@ -482,8 +485,14 @@ protected:
         case '*':
             return stack_push(lhs.value_ * rhs.value_), true;
         case '/':
+            if (rhs.value_ == 0) {
+                return error("divide by zero");
+            }
             return stack_push(lhs.value_ / rhs.value_), true;
         case '%':
+            if (rhs.value_ == 0) {
+                return error("divide by zero");
+            }
             return stack_push(lhs.value_ % rhs.value_), true;
         default:
             return error("unknown operator '%c'", op);
@@ -605,7 +614,7 @@ bool cmd_expr_t::cmd_expr_eval_t::on_execute(cmd_tokens_t& tok, cmd_output_t& ou
             out.println("  0x%llx", val.value_);
             break;
         default:
-            out.println("  return value not value or identifier");
+            out.println("  return type not value or identifier");
             return false;
         }
     }

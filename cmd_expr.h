@@ -11,7 +11,7 @@
 struct cmd_expr_t : public cmd_t {
 
     // persistent identifiers
-    std::map<std::string, std::string> idents_;
+    std::map<std::string, uint64_t> idents_;
 
     struct cmd_expr_eval_t : public cmd_t {
         cmd_expr_t& expr_;
@@ -49,7 +49,7 @@ struct cmd_expr_t : public cmd_t {
         {
             out.println("  %lld variables:", (uint64_t)expr_.idents_.size());
             for (const auto& itt : expr_.idents_) {
-                out.println("    %8s %s", itt.first.c_str(), itt.second.c_str());
+                out.println("    %8s 0x%llx", itt.first.c_str(), itt.second);
             }
             return true;
         }

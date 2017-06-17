@@ -10,25 +10,26 @@ struct exp_token_t {
         e_value,
         e_identifier,
         e_operator,
+        e_eof
     };
 
     type_t type_;
 
     enum operator_t {
-        e_op_add,
-        e_op_sub,
-        e_op_assign,
-        e_op_mul,
-        e_op_div,
-        e_op_and,
-        e_op_or,
-        e_op_lparen,
-        e_op_rparen,
+        e_op_add = '+',
+        e_op_sub = '-',
+        e_op_mul = '*',
+        e_op_div = '/',
+        e_op_and = '&',
+        e_op_or = '|',
+        e_op_assign = '=',
+        e_op_lparen = '(',
+        e_op_rparen = ')',
     };
 
+    std::string ident_;
     union {
         uint64_t value_;
-        std::string * ident_;
         operator_t op_;
     };
 };
@@ -53,6 +54,15 @@ static bool is_operator(const char ch)
     }
 }
 
+static bool is_operator(const std::string& in)
+{
+    if (in.empty()) {
+        return false;
+    }
+    const char ch = in[0];
+    return is_operator(ch);
+}
+
 static bool is_value(const char ch)
 {
     bool ret = false;
@@ -64,9 +74,14 @@ static bool is_value(const char ch)
     return ret;
 }
 
-static bool is_alpha(const char ch)
+static bool is_alpha(const std::string& val)
 {
-    return ch >= '0' && ch <= '9';
+    if (val.empty()) {
+        return false;
+    } else {
+        const char ch = val[0];
+        return ch >= '0' && ch <= '9';
+    }
 }
 
 static bool is_whitespace(const char ch)
@@ -76,10 +91,75 @@ static bool is_whitespace(const char ch)
 
 static bool is_ident(const std::string& val)
 {
-    return val.empty() ? false : (!is_alpha(val[0]));
+    if (val.empty()) {
+        return false;
+    } else {
+        const char ch = val[0];
+        bool ret = false;
+        ret |= ch >= 'a' && ch <= 'z';
+        ret |= ch >= 'A' && ch <= 'Z';
+        ret |= ch == '_';
+        return ret;
+    }
 }
 
-static size_t tokenize(const std::string& input, std::deque<std::string>& out)
+bool cmd_strtoll(const char* in, uint64_t& out, bool& neg)
+{
+    neg = false;
+    if (*in == '-') {
+        neg = true;
+        ++in;
+    }
+    uint32_t base = 10;
+    if (memcmp(in, "0x", 2) == 0) {
+        base = 16;
+        in += 2;
+    }
+    uint64_t accum = 0;
+    for (; *in != '\0'; ++in) {
+        accum *= base;
+        const uint8_t ch = *in;
+        if (ch >= '0' && ch <= '9') {
+            accum += ch - '0';
+        } else if (base == 16) {
+            if (ch >= 'a' && ch <= 'f') {
+                accum += (ch - 'a') + 10;
+            } else if (ch >= 'A' && ch <= 'F') {
+                accum += (ch - 'A') + 10;
+            }
+        } else {
+            return (*in == ' ');
+        }
+    }
+    return out = accum, true;
+}
+
+bool push_item(std::deque<exp_token_t>& q, const std::string& item)
+{
+    if (item.empty()) {
+        return false;
+    }
+    exp_token_t tok;
+    memset(&tok, 0, sizeof(tok));
+    if (is_alpha(item)) {
+        tok.type_ = tok.e_value;
+        bool neg = false;
+        cmd_strtoll(item.c_str(), tok.value_, neg);
+    } else if (is_ident(item)) {
+        tok.type_ = tok.e_identifier;
+        tok.ident_ = item;
+    } else if (is_operator(item)) {
+        tok.type_ = tok.e_operator;
+        const char ch = item[0];
+        tok.op_ = (exp_token_t::operator_t)ch;
+    } else {
+        return false;
+    }
+    q.push_back(tok);
+    return true;
+}
+
+static bool tokenize(const std::string& input, std::deque<exp_token_t>& out)
 {
     out.clear();
     const char* h = input.c_str();
@@ -95,7 +175,9 @@ static size_t tokenize(const std::string& input, std::deque<std::string>& out)
             }
             // push operators immediately
             if (is_operator(ch)) {
-                out.push_back(std::string(1, ch));
+                if (!push_item(out, std::string(1, ch))) {
+                    return false;
+                }
                 t = h + 1;
                 continue;
             }
@@ -104,8 +186,9 @@ static size_t tokenize(const std::string& input, std::deque<std::string>& out)
         else {
             // non value types signal push point
             if (!is_value(ch)) {
-                std::string tok = std::string(t, h);
-                out.push_back(std::move(tok));
+                if (!push_item(out, std::string(t, h))) {
+                    return false;
+                }
                 t = h;
                 h -= 1;
             }
@@ -113,20 +196,24 @@ static size_t tokenize(const std::string& input, std::deque<std::string>& out)
     }
     // push any remaining tokens
     if (h != t) {
-        out.push_back(std::string{ t, h });
+        if (!push_item(out, std::string(t, h))) {
+            return false;
+        }
     }
+    // push end of file token
+    out.push_back(exp_token_t{ exp_token_t::e_eof });
     // return number of parsed tokens
-    return out.size();
+    return 0 != out.size();
 }
 } // namespace {}
 
 struct cmd_expr_imp_t {
-    std::vector<std::string> stack_;
-    std::deque<std::string> input_;
-    std::map<std::string, std::string>& idents_;
+    std::vector<exp_token_t> stack_;
+    std::deque<exp_token_t> input_;
+    std::map<std::string, uint64_t>& idents_;
     std::string error_;
 
-    cmd_expr_imp_t(std::map<std::string, std::string>& i)
+    cmd_expr_imp_t(std::map<std::string, uint64_t>& i)
         : idents_(i)
     {
     }
@@ -140,12 +227,29 @@ struct cmd_expr_imp_t {
         if (!expr(0)) {
             return false;
         }
-        return stack_.size() == 1;
+        if (stack_.size() != 1) {
+            return error("expression did not produce single result");
+        }
+        return true;
     }
 
 protected:
+    bool error(const char* fmt, ...)
+    {
+        if (error_.empty()) {
+            char temp[1024];
+            va_list ap;
+            va_start(ap, fmt);
+            vsnprintf(temp, sizeof(temp), fmt, ap);
+            va_end(ap);
+            error_.assign(temp);
+        }
+        return false;
+    }
+
+#if 0
     /* return true if we have a specific token in input stream */
-    bool input_found(const std::string& tok)
+    bool input_found(const std::string & tok)
     {
         if (input_peek() == tok) {
             return input_.pop_front(), true;
@@ -153,41 +257,53 @@ protected:
             return false;
         }
     }
+#endif
 
-    /* peek the next symbol on the input stack */
-    const std::string& input_peek() const
+    bool input_found_op(const char op)
     {
-        static std::string none = std::string{};
-        return input_.empty() ? none : input_.front();
-    }
-
-    /* return next token from input stream */
-    bool input_next(std::string& out)
-    {
-        if (input_.empty()) {
+        assert(!input_.empty());
+        const exp_token_t& tok = input_.front();
+        if (tok.type_ != exp_token_t::e_operator) {
             return false;
-        } else {
-            out = input_.front();
+        }
+        if (tok.op_ == op) {
             input_.pop_front();
             return true;
         }
+        return false;
+    }
+
+    /* peek the next symbol on the input stack */
+    const exp_token_t& input_peek() const
+    {
+        assert(!input_.empty());
+        return input_.front();
+    }
+
+    /* return next token from input stream */
+    bool input_next(exp_token_t& out)
+    {
+        assert(!input_.empty());
+        out = input_.front();
+        if (out.type_ != exp_token_t::e_eof) {
+            input_.pop_front();
+        }
+        return true;
     }
 
     /* output a literal or identifier */
     bool parse_ident()
     {
-        if (input_.empty()) {
-            return false;
-        }
-        if (input_found("(")) {
+        assert(!input_.empty());
+        if (input_found_op('(')) {
             if (!expr(0x0)) {
                 return error("error in parenthesis expression");
             }
-            if (!input_found(")")) {
+            if (!input_found_op(')')) {
                 return error("unmatched parenthesis");
             }
         } else {
-            std::string temp;
+            exp_token_t temp;
             if (!input_next(temp)) {
                 return error("unable to shift next input token");
             }
@@ -196,6 +312,7 @@ protected:
         return true;
     }
 
+#if 0
     /* convert a string to a raw value */
     bool value_get(const std::string& val, uint64_t& out)
     {
@@ -223,6 +340,7 @@ protected:
         assert(neg == false);
         return out = v, true;
     }
+#endif
 
     bool value_to_hex(uint64_t val, std::string& out) const
     {
@@ -245,6 +363,7 @@ protected:
         return true;
     }
 
+#if 0
     bool value_eval(const std::string& in, std::string& out)
     {
         uint64_t val = 0;
@@ -253,16 +372,17 @@ protected:
         }
         return value_to_hex(val, out);
     }
+#endif
 
     /* pop a value from the working stack */
-    std::string stack_pop()
+    bool stack_pop(exp_token_t& out)
     {
         if (!stack_.empty()) {
-            const std::string out = *stack_.rbegin();
+            out = *stack_.rbegin();
             stack_.pop_back();
-            return out;
+            return true;
         } else {
-            return std::string{};
+            return false;
         }
     }
 
@@ -270,31 +390,39 @@ protected:
     bool stack_push(const uint64_t val)
     {
         // convert number to hex
-        std::string temp;
+        exp_token_t temp;
+        temp.type_ = temp.e_value;
+        temp.value_ = val;
+        stack_.push_back(temp);
+        return true;
+#if 0
         if (!value_to_hex(val, temp)) {
             return error("cant convert '0x%llx' to hex", val);
         } else {
             stack_.push_back(temp);
             return true;
         }
+#endif
     }
 
     /* precidence for specific operators */
-    uint32_t op_prec(const std::string& op)
+    uint32_t op_prec(const exp_token_t& in)
     {
-        if (op == "(" || op == ")") {
+        assert(in.type_ == exp_token_t::e_operator);
+        const char op = in.op_;
+        if (op == '(' || op == ')') {
             return 0;
         }
-        if (op == "=") {
+        if (op == '=') {
             return 1;
         }
-        if (op == "&" || op == "|") {
+        if (op == '&' || op == '|') {
             return 2;
         }
-        if (op == "-" || op == "+") {
+        if (op == '-' || op == '+') {
             return 3;
         }
-        if (op == "%" || op == "*" || op == "/") {
+        if (op == '%' || op == '*' || op == '/') {
             return 4;
         }
         /* unknown */ {
@@ -302,82 +430,97 @@ protected:
         }
     }
 
-    bool op_apply_assign(const std::string& lhs, const std::string& rhs)
+    bool dereference(const exp_token_t& in, exp_token_t& out) const
     {
-        if (!is_ident(lhs)) {
-            // error("cant assign to a literal %s", lhs.c_str());
-            return false;
+        // note: in and out may reference the same object
+        if (in.type_ == in.e_value) {
+            out.type_ = out.e_value;
+            out.value_ = in.value_;
+            return true;
         }
-        if (is_ident(rhs)) {
-            // convert identifier to an rvalue
-            std::string rval;
-            if (!value_eval(rhs, rval)) {
-                return error("cant convert '%s' into rvalue", rhs.c_str());
+        if (in.type_ == in.e_identifier) {
+            auto itt = idents_.find(in.ident_);
+            if (itt == idents_.end()) {
+                return false;
             }
-            idents_[lhs] = rval;
-        } else {
-            // is already and rvalue literal so use directly
-            idents_[lhs] = rhs;
-        }
-        stack_.push_back(lhs);
-        return true;
-    }
-
-    bool error(const char* fmt, ...)
-    {
-        if (error_.empty()) {
-            char temp[1024];
-            va_list ap;
-            va_start(ap, fmt);
-            vsnprintf(temp, sizeof(temp), fmt, ap);
-            va_end(ap);
-            error_.assign(temp);
+            out.type_ = out.e_value;
+            out.value_ = itt->second;
+            return true;
         }
         return false;
     }
 
-    bool op_apply_generic(const char op, const std::string& lhs, const std::string& rhs)
+    bool op_apply_assign(const exp_token_t& lhs, exp_token_t rhs)
     {
-        uint64_t vlhs = 0, vrhs = 0;
-        if (!value_get(lhs, vlhs) || !value_get(rhs, vrhs)) {
-            return error("unable to convert lhr or rhs to rvalues");
+        if (lhs.type_ != exp_token_t::e_identifier) {
+            return error("cant assign to a literal");
         }
-        switch (op) {
+        assert(rhs.type_ == exp_token_t::e_value);
+        idents_[lhs.ident_] = rhs.value_;
+        stack_.push_back(lhs);
+        return true;
+    }
+
+    bool op_apply_generic(const exp_token_t& op, exp_token_t& lhs, exp_token_t& rhs)
+    {
+        assert(op.type_ == exp_token_t::e_operator);
+        if (lhs.type_ == exp_token_t::e_identifier) {
+            if (!dereference(lhs, lhs)) {
+                return error("cant dereference '%s'", lhs.ident_.c_str());
+            }
+        }
+        assert(lhs.type_ == exp_token_t::e_value && rhs.type_ == exp_token_t::e_value);
+        switch (op.op_) {
         case '&':
-            return stack_push(vlhs & vrhs), true;
+            return stack_push(lhs.value_ & rhs.value_), true;
         case '|':
-            return stack_push(vlhs | vrhs), true;
+            return stack_push(lhs.value_ | rhs.value_), true;
         case '-':
-            return stack_push(vlhs - vrhs), true;
+            return stack_push(lhs.value_ - rhs.value_), true;
         case '+':
-            return stack_push(vlhs + vrhs), true;
+            return stack_push(lhs.value_ + rhs.value_), true;
         case '*':
-            return stack_push(vlhs * vrhs), true;
+            return stack_push(lhs.value_ * rhs.value_), true;
         case '/':
-            return stack_push(vlhs / vrhs), true;
+            return stack_push(lhs.value_ / rhs.value_), true;
         case '%':
-            return stack_push(vlhs & vrhs), true;
+            return stack_push(lhs.value_ % rhs.value_), true;
         default:
             return error("unknown operator '%c'", op);
         }
     }
 
     /* apply an operator to the working value stack */
-    bool op_apply(std::string& op_str)
+    bool op_apply(const exp_token_t& op)
     {
-        assert(!op_str.empty());
-        const std::string rhs = stack_pop();
-        const std::string lhs = stack_pop();
-        if (lhs.empty() || rhs.empty() || op_str.empty()) {
-            return error("expression not fully formed");
+        assert(op.type_ == exp_token_t::e_operator);
+        exp_token_t rhs, lhs;
+        if (!stack_pop(rhs)) {
+            return error("missing rhs of expression");
         }
-        const char op = op_str[0];
-        switch (op) {
+        if (!stack_pop(lhs)) {
+            return error("missing lhs of expression");
+        }
+        // we can dereference the RHS in anticipation
+        if (rhs.type_ == exp_token_t::e_identifier) {
+            if (!dereference(rhs, rhs)) {
+                return error("cant dereference '%s'", rhs.ident_.c_str());
+            }
+        }
+        assert(rhs.type_ == rhs.e_value);
+        // dispatch based on operator type
+        switch (op.op_) {
         case '=':
             return op_apply_assign(lhs, rhs);
         default:
             return op_apply_generic(op, lhs, rhs);
         }
+    }
+
+    bool input_eof() const
+    {
+        assert(!input_.empty());
+        return input_.front().type_ == exp_token_t::e_eof;
     }
 
     /* consume input until a minium precedence is reached */
@@ -388,13 +531,27 @@ protected:
             return error("expecting literal or identifier");
         }
         // check for end of input
-        if (input_.empty()) {
+        if (input_eof()) {
             return true;
         }
-        std::string op;
-        while (op_prec(input_peek()) > min_prec) {
+        exp_token_t op;
+        // todo: make this peek robust and check if operator
+        while (true) {
+            // halting condition
+            {
+                const exp_token_t& temp = input_peek();
+                if (temp.type_ != temp.e_operator) {
+                    return error("expecting operator");
+                }
+                if (op_prec(temp) <= min_prec) {
+                    break;
+                }
+            }
             // get the next operator
             if (!input_next(op)) {
+                return error("expecting operator");
+            }
+            if (op.type_ != op.e_operator) {
                 return error("expecting operator");
             }
             if (!expr(op_prec(op))) {
@@ -402,10 +559,10 @@ protected:
             }
             // apply this operator
             if (!op_apply(op)) {
-                return error("unable to apply operator '%s'", op.c_str());
+                return error("unable to apply operator '%c'", op.op_);
             }
             // if we have exhausted the input stop looping
-            if (input_.empty()) {
+            if (input_eof()) {
                 break;
             }
         }
@@ -427,22 +584,29 @@ bool cmd_expr_t::cmd_expr_eval_t::on_execute(cmd_tokens_t& tok, cmd_output_t& ou
         return false;
     }
     // print results
-    for (const std::string& val : state.stack_) {
+    for (const exp_token_t& val : state.stack_) {
         out.print("  ");
-        if (is_ident(val)) {
+        switch (val.type_) {
+        case exp_token_t::e_identifier: {
             auto& idents = state.idents_;
-            auto itt = idents.find(val);
+            auto itt = idents.find(val.ident_);
             if (itt == idents.end()) {
                 // unknown identifier
-                out.println("unknown identifier '%s'", val.c_str());
+                out.println("unknown identifier '%s'", val.ident_.c_str());
             } else {
                 // print key value pair
                 const std::string& key = itt->first;
-                const std::string& value = itt->second;
-                out.println("  %s = %s", key.c_str(), value.c_str());
+                const uint64_t& value = itt->second;
+                out.println("  %s = 0x%llx", key.c_str(), value);
             }
-        } else {
-            out.println("  %s", val.c_str());
+            break;
+        }
+        case exp_token_t::e_value:
+            out.println("  0x%llx", val.value_);
+            break;
+        default:
+            out.println("  return value not value or identifier");
+            return false;
         }
     }
     return true;

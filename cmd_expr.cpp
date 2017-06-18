@@ -12,7 +12,6 @@ struct exp_token_t {
         e_operator,
         e_eof
     };
-
     type_t type_;
 
     enum operator_t {
@@ -247,18 +246,6 @@ protected:
         return false;
     }
 
-#if 0
-    /* return true if we have a specific token in input stream */
-    bool input_found(const std::string & tok)
-    {
-        if (input_peek() == tok) {
-            return input_.pop_front(), true;
-        } else {
-            return false;
-        }
-    }
-#endif
-
     bool input_found_op(const char op)
     {
         assert(!input_.empty());
@@ -291,6 +278,12 @@ protected:
         return true;
     }
 
+    bool input_eof() const
+    {
+        assert(!input_.empty());
+        return input_.front().type_ == exp_token_t::e_eof;
+    }
+
     /* output a literal or identifier */
     bool parse_ident()
     {
@@ -311,68 +304,6 @@ protected:
         }
         return true;
     }
-
-#if 0
-    /* convert a string to a raw value */
-    bool value_get(const std::string& val, uint64_t& out)
-    {
-        const char* tval = val.c_str();
-        if (val.empty()) {
-            return false;
-        }
-        if (!is_alpha(val[0])) {
-            // try to parse as an identifier
-            auto itt = idents_.find(val);
-            if (itt != idents_.end()) {
-                // lookup stored value
-                tval = itt->second.c_str();
-            } else {
-                // unknown identifier
-                return false;
-            }
-        }
-        // try to parse as an integer literal
-        uint64_t v = 0;
-        bool neg = false;
-        if (!cmd_token_t::strtoll(tval, v, neg)) {
-            return error("cant convert '%s' to integer", tval);
-        }
-        assert(neg == false);
-        return out = v, true;
-    }
-#endif
-
-    bool value_to_hex(uint64_t val, std::string& out) const
-    {
-        static const char* table = "0123456789abcdef";
-        char temp[32];
-        uint32_t head = 0;
-        // hex start marker
-        out.clear();
-        out.append("0x");
-        // hexify
-        do {
-            const uint32_t digit = val % 16;
-            temp[head++] = table[digit];
-            val = val / 16;
-        } while (val);
-        // append in reverse order
-        for (; head; --head) {
-            out.append(1, temp[head - 1]);
-        }
-        return true;
-    }
-
-#if 0
-    bool value_eval(const std::string& in, std::string& out)
-    {
-        uint64_t val = 0;
-        if (!value_get(in, val)) {
-            return error("cant evaluate '%s'", in.c_str());
-        }
-        return value_to_hex(val, out);
-    }
-#endif
 
     /* pop a value from the working stack */
     bool stack_pop(exp_token_t& out)
@@ -395,19 +326,10 @@ protected:
         temp.value_ = val;
         stack_.push_back(temp);
         return true;
-#if 0
-        if (!value_to_hex(val, temp)) {
-            return error("cant convert '0x%llx' to hex", val);
-        }
-        else {
-            stack_.push_back(temp);
-            return true;
-        }
-#endif
     }
 
     /* precidence for specific operators */
-    uint32_t op_prec(const exp_token_t& in)
+    uint32_t op_prec(const exp_token_t& in) const
     {
         assert(in.type_ == exp_token_t::e_operator);
         const char op = in.op_;
@@ -462,7 +384,7 @@ protected:
         return true;
     }
 
-    bool op_apply_generic(const exp_token_t& op, exp_token_t& lhs, exp_token_t& rhs)
+    bool op_apply_generic(const exp_token_t& op, exp_token_t& lhs, const exp_token_t& rhs)
     {
         assert(op.type_ == exp_token_t::e_operator);
         if (lhs.type_ == exp_token_t::e_identifier) {
@@ -528,12 +450,6 @@ protected:
         }
     }
 
-    bool input_eof() const
-    {
-        assert(!input_.empty());
-        return input_.front().type_ == exp_token_t::e_eof;
-    }
-
     /* consume input until a minium precedence is reached */
     bool expr(uint32_t min_prec)
     {
@@ -589,7 +505,7 @@ bool cmd_expr_t::cmd_expr_eval_t::on_execute(cmd_tokens_t& tok, cmd_output_t& ou
         return error(out, "  malformed expression");
     }
     // execute the expression
-    cmd_expr_imp_t state(expr_.idents_);
+    cmd_expr_imp_t state(parser_.idents_);
     if (!state.evaluate(expr)) {
         out.println("  error: %s", state.error_.c_str());
         return false;

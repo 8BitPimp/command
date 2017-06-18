@@ -1,6 +1,7 @@
 #pragma once
 #include <cassert>
 #include <cstdarg>
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <queue>
@@ -9,6 +10,7 @@
 #include <vector>
 
 typedef std::vector<std::unique_ptr<struct cmd_t>> cmd_list_t;
+typedef std::map<std::string, uint64_t> cmd_idents_t;
 typedef void* cmd_baton_t;
 
 struct cmd_output_t {
@@ -112,7 +114,10 @@ protected:
 
 struct cmd_tokens_t {
 
-    cmd_tokens_t()
+    cmd_idents_t* idents_;
+
+    cmd_tokens_t(cmd_idents_t* idents)
+        : idents_(idents)
     {
     }
 
@@ -136,7 +141,7 @@ struct cmd_tokens_t {
         }
     }
 
-    void push(const std::string& input)
+    void push(std::string input)
     {
         /* flush when input is empty */
         if (input.empty()) {
@@ -145,6 +150,18 @@ struct cmd_tokens_t {
                 stage_pair_.first.clear();
             }
             return;
+        }
+        /* process identifier substitution */
+        if (idents_) {
+            if (input[0] == '$') {
+                const char* temp = input.c_str() + 1;
+                auto itt = idents_->find(temp);
+                if (itt != idents_->end()) {
+                    const uint64_t val = itt->second;
+                    // todo: convert to hex string
+                    input = std::to_string(val);
+                }
+            }
         }
         /* add to raw token set */
         raw_.push_back(input);
@@ -334,6 +351,8 @@ struct cmd_parser_t {
     cmd_list_t sub_;
     std::map<std::string, cmd_t*> alias_;
     std::vector<std::string> history_;
+    // identifiers
+    cmd_idents_t idents_;
 
     cmd_parser_t(cmd_baton_t user = nullptr)
         : user_(user)

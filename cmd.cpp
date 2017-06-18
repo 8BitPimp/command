@@ -113,11 +113,10 @@ uint32_t cmd_parser_t::levenshtein(const char* s1, const char* s2)
 bool cmd_parser_t::execute(const std::string& expr, cmd_output_t& out)
 {
     const std::string prev_cmd = last_cmd();
-
     // add to history buffer
     history_.push_back(expr);
     // tokenize command string
-    cmd_tokens_t tokens;
+    cmd_tokens_t tokens(&idents_);
     if (tokenize(expr.c_str(), tokens) == 0) {
         if (!last_cmd().empty()) {
             return execute(prev_cmd, out);
@@ -126,10 +125,8 @@ bool cmd_parser_t::execute(const std::string& expr, cmd_output_t& out)
             return false;
         }
     }
-
     cmd_list_t* list = &sub_;
     std::vector<cmd_t*> cmd_vec;
-
     // check for aliases
     cmd_t* cmd = alias_find(tokens.token_front());
     if (cmd) {

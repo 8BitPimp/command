@@ -139,7 +139,7 @@ struct cmd_token_t {
     {
         bool neg = false;
         uint64_t value = 0;
-        if (!strtoll(token_.c_str(), value, neg)) {
+        if (!cmd_util_t::strtoll(token_.c_str(), value, neg)) {
             return false;
         }
         out = static_cast<type_t>(neg ? -value : value);

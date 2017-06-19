@@ -8,6 +8,7 @@ struct cmd_help_t : public cmd_t {
             : cmd_t("tree", cli, parent, user)
         {
             usage_ = R"(list all commands and their sub commands)";
+            parser_.history_.push_back("help");
         }
 
         void walk(const cmd_list_t& list, cmd_output_t& out, uint32_t indent)

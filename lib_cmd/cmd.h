@@ -13,6 +13,19 @@ typedef std::vector<std::unique_ptr<struct cmd_t>> cmd_list_t;
 typedef std::map<std::string, uint64_t> cmd_idents_t;
 typedef void* cmd_baton_t;
 
+/* common utility functions for the command parser */
+struct cmd_util_t {
+    // more robust string to uint64
+    static bool strtoll(const char* in, uint64_t& out, bool& neg);
+
+    // levenshtein string distance function
+    static uint32_t levenshtein(const char* s1, const char* s2);
+
+    // substring match (return match length, or -1 if different)
+    static int32_t str_match(const char* str, const char* sub);
+};
+
+/* command output writer */
 struct cmd_output_t {
     FILE* fd_;
 
@@ -57,8 +70,56 @@ struct cmd_output_t {
     }
 };
 
-struct cmd_token_t {
+/* command locale text definitions */
+struct cmd_locale_t {
+    static void possible_completions(cmd_output_t& out)
+    {
+        out.println("  possible completions:");
+    }
 
+    static void invalid_command(cmd_output_t& out)
+    {
+        out.println("  invalid command");
+    }
+
+    static void no_subcommand(cmd_output_t& out, const char* cmd)
+    {
+        out.println("  no subcommand '%s'", cmd);
+    }
+
+    static void did_you_meen(cmd_output_t& out)
+    {
+        out.println("  did you meen:");
+    }
+
+    static void not_val_or_ident(cmd_output_t& out)
+    {
+        out.println("  return type not value or identifier");
+    }
+
+    static void unknown_ident(cmd_output_t& out, const char* ident)
+    {
+        out.println("  unknown identifier '%s'", ident);
+    }
+
+    static void malformed_exp(cmd_output_t& out)
+    {
+        out.println("  malformed expression");
+    }
+
+    static void error(cmd_output_t& out, const char* err)
+    {
+        out.println("  error: %s", err);
+    }
+
+    static void usage(cmd_output_t& out, const char* path, const char* args)
+    {
+        out.println("  usage: %s %s", path, args ? args : "");
+    }
+};
+
+/* command argument token */
+struct cmd_token_t {
     cmd_token_t()
     {
     }
@@ -106,14 +167,12 @@ struct cmd_token_t {
         return token_.c_str();
     }
 
-    static bool strtoll(const char* in, uint64_t& out, bool& neg);
-
 protected:
     std::string token_;
 };
 
+/* command arguments token list */
 struct cmd_tokens_t {
-
     cmd_idents_t* idents_;
 
     cmd_tokens_t(cmd_idents_t* idents)
@@ -255,6 +314,7 @@ protected:
     std::set<std::string> flags_;
 };
 
+/* command base class */
 struct cmd_t {
     // command name
     const char* const name_;
@@ -316,7 +376,7 @@ struct cmd_t {
     {
         std::string path;
         get_command_path(path);
-        out.print("  usage: %s %s", path.c_str(), usage_ ? usage_ : "");
+        cmd_locale_t::usage(out, path.c_str(), usage_);
         out.eol();
         return usage_ != nullptr;
     }
@@ -346,6 +406,7 @@ protected:
     }
 };
 
+/* command parser */
 struct cmd_parser_t {
     void* user_;
     cmd_list_t sub_;
@@ -357,7 +418,6 @@ struct cmd_parser_t {
     cmd_parser_t(cmd_baton_t user = nullptr)
         : user_(user)
     {
-        history_.push_back("help");
     }
 
     const std::string& last_cmd() const
@@ -399,6 +459,4 @@ struct cmd_parser_t {
         auto itt = alias_.find(alias);
         return itt == alias_.end() ? nullptr : itt->second;
     }
-
-    static uint32_t levenshtein(const char* s1, const char* s2);
 };

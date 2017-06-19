@@ -4,6 +4,108 @@
 
 #include "cmd_expr.h"
 
+struct cmd_exp_error_t {
+
+    std::vector<std::string> error_;
+
+    bool error(const char* fmt, ...)
+    {
+        if (error_.empty()) {
+            char temp[1024];
+            va_list ap;
+            va_start(ap, fmt);
+            vsnprintf(temp, sizeof(temp), fmt, ap);
+            va_end(ap);
+            error_.push_back(temp);
+        }
+        /* return false to make error prop easier */
+        return false;
+    }
+
+    bool print(cmd_output_t& out)
+    {
+        for (const std::string& err : error_) {
+            out.println("  %s", err.c_str());
+        }
+        return true;
+    }
+
+    bool error_non_single_result()
+    {
+        return error("expression did not produce single result");
+    }
+
+    bool error_in_paren_exp()
+    {
+        return error("error in parenthesis expression");
+    }
+
+    bool error_unmatched_paren()
+    {
+        return error("unmatched parenthesis");
+    }
+
+    bool error_cant_shift_input()
+    {
+        return error("unable to shift next input token");
+    }
+
+    bool error_cant_deref(const char* ident)
+    {
+        return error("cant dereference '%s'", ident);
+    }
+
+    bool error_cant_assign_literal()
+    {
+        return error("cant assign to a literal");
+    }
+
+    bool error_malformed_expr()
+    {
+        return error("malformed expression");
+    }
+
+    bool error_div_zero()
+    {
+        return error("divide by zero");
+    }
+
+    bool error_unknown_op(const char op)
+    {
+        return error("unknown operator '%c'", op);
+    }
+
+    bool error_missing_rhs()
+    {
+        return error("missing rhs of expression");
+    }
+
+    bool error_missing_lhs()
+    {
+        return error("missing lhs of expression");
+    }
+
+    bool error_rhs_needs_rvalue()
+    {
+        return error("rhs must be an rvalue");
+    }
+
+    bool error_expect_op()
+    {
+        return error("expecting operator");
+    }
+
+    bool error_expect_lit_or_ident()
+    {
+        return error("expecting literal or identifier");
+    }
+
+    bool error_applying_op(const char op)
+    {
+        return error("unable to apply operator '%c'", op);
+    }
+};
+
 namespace {
 struct exp_token_t {
     enum type_t {
@@ -33,184 +135,159 @@ struct exp_token_t {
     };
 };
 
-static bool is_operator(const char ch)
-{
-    switch (ch) {
-    case '(':
-    case ')':
-    case '+':
-    case '-':
-    case '/':
-    case '*':
-    case '%':
-    case '&':
-    case '|':
-    case '=':
-    case '.':
-        return true;
-    default:
-        return false;
-    }
-}
-
-static bool is_operator(const std::string& in)
-{
-    if (in.empty()) {
-        return false;
-    }
-    const char ch = in[0];
-    return is_operator(ch);
-}
-
-static bool is_value(const char ch)
-{
-    bool ret = false;
-    ret |= ch >= 'a' && ch <= 'z';
-    ret |= ch >= 'A' && ch <= 'Z';
-    ret |= ch >= '0' && ch <= '9';
-    ret |= ch == '$';
-    ret |= ch == '_';
-    return ret;
-}
-
-static bool is_alpha(const std::string& val)
-{
-    if (val.empty()) {
-        return false;
-    } else {
-        const char ch = val[0];
-        return ch >= '0' && ch <= '9';
-    }
-}
-
-static bool is_whitespace(const char ch)
-{
-    return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n';
-}
-
-static bool is_ident(const std::string& val)
-{
-    if (val.empty()) {
-        return false;
-    } else {
-        const char ch = val[0];
-        bool ret = false;
-        ret |= ch >= 'a' && ch <= 'z';
-        ret |= ch >= 'A' && ch <= 'Z';
-        ret |= ch == '_';
-        return ret;
-    }
-}
-
-bool cmd_strtoll(const char* in, uint64_t& out, bool& neg)
-{
-    neg = false;
-    if (*in == '-') {
-        neg = true;
-        ++in;
-    }
-    uint32_t base = 10;
-    if (memcmp(in, "0x", 2) == 0) {
-        base = 16;
-        in += 2;
-    }
-    uint64_t accum = 0;
-    for (; *in != '\0'; ++in) {
-        accum *= base;
-        const uint8_t ch = *in;
-        if (ch >= '0' && ch <= '9') {
-            accum += ch - '0';
-        } else if (base == 16) {
-            if (ch >= 'a' && ch <= 'f') {
-                accum += (ch - 'a') + 10;
-            } else if (ch >= 'A' && ch <= 'F') {
-                accum += (ch - 'A') + 10;
-            }
-        } else {
-            return (*in == ' ');
-        }
-    }
-    return out = accum, true;
-}
-
-bool push_item(std::deque<exp_token_t>& q, const std::string& item)
-{
-    if (item.empty()) {
-        return false;
-    }
-    exp_token_t tok;
-    memset(&tok, 0, sizeof(tok));
-    if (is_alpha(item)) {
-        tok.type_ = tok.e_value;
-        bool neg = false;
-        cmd_strtoll(item.c_str(), tok.value_, neg);
-    } else if (is_ident(item)) {
-        tok.type_ = tok.e_identifier;
-        tok.ident_ = item;
-    } else if (is_operator(item)) {
-        tok.type_ = tok.e_operator;
-        const char ch = item[0];
-        tok.op_ = (exp_token_t::operator_t)ch;
-    } else {
-        return false;
-    }
-    q.push_back(tok);
-    return true;
-}
-
-static bool tokenize(const std::string& input, std::deque<exp_token_t>& out)
-{
-    out.clear();
-    const char* h = input.c_str();
-    const char* t = input.c_str();
-    for (; *h != '\0'; ++h) {
-        const char ch = *h;
-        // if head == tail
-        if (h == t) {
-            // skip over whitespaces
-            if (is_whitespace(ch)) {
-                ++t;
-                continue;
-            }
-            // push operators immediately
-            if (is_operator(ch)) {
-                if (!push_item(out, std::string(1, ch))) {
-                    return false;
-                }
-                t = h + 1;
-                continue;
-            }
-        }
-        // if head != tail
-        else {
-            // non value types signal push point
-            if (!is_value(ch)) {
-                if (!push_item(out, std::string(t, h))) {
-                    return false;
-                }
-                t = h;
-                h -= 1;
-            }
-        }
-    }
-    // push any remaining tokens
-    if (h != t) {
-        if (!push_item(out, std::string(t, h))) {
+struct cmd_exp_lexer_t {
+    bool is_operator(const char ch)
+    {
+        switch (ch) {
+        case '(':
+        case ')':
+        case '+':
+        case '-':
+        case '/':
+        case '*':
+        case '%':
+        case '&':
+        case '|':
+        case '=':
+        case '.':
+            return true;
+        default:
             return false;
         }
     }
-    // push end of file token
-    out.push_back(exp_token_t{ exp_token_t::e_eof });
-    // return number of parsed tokens
-    return 0 != out.size();
-}
+
+    bool is_operator(const std::string& in)
+    {
+        if (in.empty()) {
+            return false;
+        }
+        const char ch = in[0];
+        return is_operator(ch);
+    }
+
+    bool is_value(const char ch)
+    {
+        bool ret = false;
+        ret |= ch >= 'a' && ch <= 'z';
+        ret |= ch >= 'A' && ch <= 'Z';
+        ret |= ch >= '0' && ch <= '9';
+        ret |= ch == '$';
+        ret |= ch == '_';
+        return ret;
+    }
+
+    bool is_alpha(const std::string& val)
+    {
+        if (val.empty()) {
+            return false;
+        } else {
+            const char ch = val[0];
+            return ch >= '0' && ch <= '9';
+        }
+    }
+
+    bool is_whitespace(const char ch)
+    {
+        return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n';
+    }
+
+    bool is_ident(const std::string& val)
+    {
+        if (val.empty()) {
+            return false;
+        } else {
+            const char ch = val[0];
+            bool ret = false;
+            ret |= ch >= 'a' && ch <= 'z';
+            ret |= ch >= 'A' && ch <= 'Z';
+            ret |= ch == '_';
+            return ret;
+        }
+    }
+
+    // clasify and push item into input token queue
+    bool push_item(std::deque<exp_token_t>& q, const std::string& item)
+    {
+        if (item.empty()) {
+            return false;
+        }
+        exp_token_t tok;
+        memset(&tok, 0, sizeof(tok));
+        if (is_alpha(item)) {
+            tok.type_ = tok.e_value;
+            bool neg = false;
+            cmd_util_t::strtoll(item.c_str(), tok.value_, neg);
+        } else if (is_ident(item)) {
+            tok.type_ = tok.e_identifier;
+            tok.ident_ = item;
+        } else if (is_operator(item)) {
+            tok.type_ = tok.e_operator;
+            const char ch = item[0];
+            tok.op_ = (exp_token_t::operator_t)ch;
+        } else {
+            return false;
+        }
+        q.push_back(tok);
+        return true;
+    }
+
+    // produce parsed token queue from an input string
+    bool tokenize(const std::string& input, std::deque<exp_token_t>& out)
+    {
+        out.clear();
+        const char* h = input.c_str();
+        const char* t = input.c_str();
+        for (; *h != '\0'; ++h) {
+            const char ch = *h;
+            // if head == tail
+            if (h == t) {
+                // skip over whitespaces
+                if (is_whitespace(ch)) {
+                    ++t;
+                    continue;
+                }
+                // push operators immediately
+                if (is_operator(ch)) {
+                    if (!push_item(out, std::string(1, ch))) {
+                        return false;
+                    }
+                    t = h + 1;
+                    continue;
+                }
+            }
+            // if head != tail
+            else {
+                // non value types signal push point
+                if (!is_value(ch)) {
+                    if (!push_item(out, std::string(t, h))) {
+                        return false;
+                    }
+                    t = h;
+                    h -= 1;
+                }
+            }
+        }
+        // push any remaining tokens
+        if (h != t) {
+            if (!push_item(out, std::string(t, h))) {
+                return false;
+            }
+        }
+        // push end of file token
+        out.push_back(exp_token_t{ exp_token_t::e_eof });
+        // return number of parsed tokens
+        return 0 != out.size();
+    }
+};
+
 } // namespace {}
 
+// command expression evaluation implementation
 struct cmd_expr_imp_t {
     std::vector<exp_token_t> stack_;
     std::deque<exp_token_t> input_;
     std::map<std::string, uint64_t>& idents_;
-    std::string error_;
+    cmd_exp_error_t error_;
 
     cmd_expr_imp_t(std::map<std::string, uint64_t>& i)
         : idents_(i)
@@ -220,32 +297,20 @@ struct cmd_expr_imp_t {
     /* evaluate a given expression */
     bool evaluate(const std::string& exp)
     {
-        if (!tokenize(exp, input_)) {
+        cmd_exp_lexer_t lexer;
+        if (!lexer.tokenize(exp, input_)) {
             return false;
         }
         if (!expr(0)) {
             return false;
         }
         if (stack_.size() != 1) {
-            return error("expression did not produce single result");
+            return error_.error_non_single_result();
         }
         return true;
     }
 
 protected:
-    bool error(const char* fmt, ...)
-    {
-        if (error_.empty()) {
-            char temp[1024];
-            va_list ap;
-            va_start(ap, fmt);
-            vsnprintf(temp, sizeof(temp), fmt, ap);
-            va_end(ap);
-            error_.assign(temp);
-        }
-        return false;
-    }
-
     bool input_found_op(const char op)
     {
         assert(!input_.empty());
@@ -291,15 +356,15 @@ protected:
         assert(!input_.empty());
         if (input_found_op('(')) {
             if (!expr(0x0)) {
-                return error("error in parenthesis expression");
+                return error_.error_in_paren_exp();
             }
             if (!input_found_op(')')) {
-                return error("unmatched parenthesis");
+                return error_.error_unmatched_paren();
             }
         } else {
             exp_token_t temp;
             if (!input_next(temp)) {
-                return error("unable to shift next input token");
+                return error_.error_cant_shift_input();
             }
             stack_.push_back(temp);
         }
@@ -378,7 +443,7 @@ protected:
     bool op_apply_assign(const exp_token_t& lhs, exp_token_t rhs)
     {
         if (lhs.type_ != exp_token_t::e_identifier) {
-            return error("cant assign to a literal");
+            return error_.error_cant_assign_literal();
         }
         assert(rhs.type_ == exp_token_t::e_value);
         idents_[lhs.ident_] = rhs.value_;
@@ -391,11 +456,11 @@ protected:
         assert(op.type_ == exp_token_t::e_operator);
         if (lhs.type_ == exp_token_t::e_identifier) {
             if (!dereference(lhs, lhs)) {
-                return error("cant dereference '%s'", lhs.ident_.c_str());
+                return error_.error_cant_deref(lhs.ident_.c_str());
             }
         }
         if (lhs.type_ != exp_token_t::e_value || rhs.type_ != exp_token_t::e_value) {
-            return error("malformed expression");
+            return error_.error_malformed_expr();
         }
         switch (op.op_) {
         case '&':
@@ -410,16 +475,16 @@ protected:
             return stack_push(lhs.value_ * rhs.value_), true;
         case '/':
             if (rhs.value_ == 0) {
-                return error("divide by zero");
+                return error_.error_div_zero();
             }
             return stack_push(lhs.value_ / rhs.value_), true;
         case '%':
             if (rhs.value_ == 0) {
-                return error("divide by zero");
+                return error_.error_div_zero();
             }
             return stack_push(lhs.value_ % rhs.value_), true;
         default:
-            return error("unknown operator '%c'", op);
+            return error_.error_unknown_op(op.op_);
         }
     }
 
@@ -429,19 +494,19 @@ protected:
         assert(op.type_ == exp_token_t::e_operator);
         exp_token_t rhs, lhs;
         if (!stack_pop(rhs)) {
-            return error("missing rhs of expression");
+            return error_.error_missing_rhs();
         }
         if (!stack_pop(lhs)) {
-            return error("missing lhs of expression");
+            return error_.error_missing_lhs();
         }
         // we can dereference the RHS in anticipation
         if (rhs.type_ == exp_token_t::e_identifier) {
             if (!dereference(rhs, rhs)) {
-                return error("cant dereference '%s'", rhs.ident_.c_str());
+                return error_.error_cant_deref(rhs.ident_.c_str());
             }
         }
         if (rhs.type_ != rhs.e_value) {
-            return error("rhs must be an rvalue");
+            return error_.error_rhs_needs_rvalue();
         }
         // dispatch based on operator type
         switch (op.op_) {
@@ -457,7 +522,7 @@ protected:
     {
         // consume a literal or identifier
         if (!parse_ident()) {
-            return error("expecting literal or identifier");
+            return error_.error_expect_lit_or_ident();
         }
         // check for end of input
         if (input_eof()) {
@@ -470,7 +535,7 @@ protected:
             {
                 const exp_token_t& temp = input_peek();
                 if (temp.type_ != temp.e_operator) {
-                    return error("expecting operator");
+                    return error_.error_expect_op();
                 }
                 if (op_prec(temp) <= min_prec) {
                     break;
@@ -478,17 +543,17 @@ protected:
             }
             // get the next operator
             if (!input_next(op)) {
-                return error("expecting operator");
+                return error_.error_expect_op();
             }
             if (op.type_ != op.e_operator) {
-                return error("expecting operator");
+                return error_.error_expect_op();
             }
             if (!expr(op_prec(op))) {
                 return false;
             }
             // apply this operator
             if (!op_apply(op)) {
-                return error("unable to apply operator '%c'", op.op_);
+                return error_.error_applying_op(op.op_);
             }
             // if we have exhausted the input stop looping
             if (input_eof()) {
@@ -504,13 +569,12 @@ bool cmd_expr_t::cmd_expr_eval_t::on_execute(cmd_tokens_t& tok, cmd_output_t& ou
     // turn arguments into expression string
     std::string expr;
     if (!join_expr(tok, expr)) {
-        return error(out, "  malformed expression");
+        return cmd_locale_t::malformed_exp(out), false;
     }
     // execute the expression
     cmd_expr_imp_t state(parser_.idents_);
     if (!state.evaluate(expr)) {
-        out.println("  error: %s", state.error_.c_str());
-        return false;
+        return state.error_.print(out), false;
     }
     // print results
     for (const exp_token_t& val : state.stack_) {
@@ -521,7 +585,7 @@ bool cmd_expr_t::cmd_expr_eval_t::on_execute(cmd_tokens_t& tok, cmd_output_t& ou
             auto itt = idents.find(val.ident_);
             if (itt == idents.end()) {
                 // unknown identifier
-                out.println("unknown identifier '%s'", val.ident_.c_str());
+                cmd_locale_t::unknown_ident(out, val.ident_.c_str());
             } else {
                 // print key value pair
                 const std::string& key = itt->first;
@@ -534,8 +598,7 @@ bool cmd_expr_t::cmd_expr_eval_t::on_execute(cmd_tokens_t& tok, cmd_output_t& ou
             out.println("  0x%llx", val.value_);
             break;
         default:
-            out.println("  return type not value or identifier");
-            return false;
+            return cmd_locale_t::not_val_or_ident(out), false;
         }
     }
     return true;

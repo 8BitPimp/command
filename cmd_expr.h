@@ -40,7 +40,7 @@ struct cmd_expr_t : public cmd_t {
 
         virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
         {
-            const cmd_idents_t & idents = parser_.idents_;
+            const cmd_idents_t& idents = parser_.idents_;
             out.println("  %lld variables:", (uint64_t)idents.size());
             for (const auto& itt : idents) {
                 out.println("    %8s 0x%llx", itt.first.c_str(), itt.second);

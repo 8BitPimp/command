@@ -278,6 +278,7 @@ protected:
         return true;
     }
 
+    /* end of file */
     bool input_eof() const
     {
         assert(!input_.empty());
@@ -353,6 +354,7 @@ protected:
         }
     }
 
+    /* lookup idenfier value */
     bool dereference(const exp_token_t& in, exp_token_t& out) const
     {
         // note: in and out may reference the same object

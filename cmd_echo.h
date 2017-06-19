@@ -3,7 +3,7 @@
 
 struct cmd_echo_t : public cmd_t {
 
-    cmd_echo_t(cmd_parser_t& cli, cmd_t * parent, cmd_baton_t user)
+    cmd_echo_t(cmd_parser_t& cli, cmd_t* parent, cmd_baton_t user)
         : cmd_t("echo", cli, parent, user)
     {
         usage_ = R"([arg] [arg] ...

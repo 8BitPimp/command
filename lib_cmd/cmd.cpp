@@ -205,14 +205,6 @@ bool cmd_parser_t::execute(const std::string& expr, cmd_output_t* cmd_out)
     return false;
 }
 
-bool cmd_parser_t::find(const std::string& expr,
-    std::vector<std::string>& out)
-{
-    (void)expr;
-    (void)out;
-    return false;
-}
-
 bool cmd_parser_t::alias_add(cmd_t* cmd, const std::string& alias)
 {
     assert(cmd && !alias.empty());
@@ -342,7 +334,7 @@ struct cmd_output_stdio_t : public cmd_output_t {
     }
 };
 
-cmd_output_t* cmd_parser_t::create_output_stdio(FILE* fd)
+cmd_output_t* cmd_output_t::create_output_stdio(FILE* fd)
 {
     return new cmd_output_stdio_t(fd);
 }

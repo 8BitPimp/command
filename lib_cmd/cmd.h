@@ -25,9 +25,19 @@ struct cmd_util_t {
     static int32_t str_match(const char* str, const char* sub);
 };
 
-/* command output writer */
+/// Command output interface base class
+/// this class brokers all output text writing from cmd_t classes during command execution.
+/// using a specific class we can ensure consisten output and eliminate output race conditions.
+/// a versatile iterface also makes it easy to output text in a range of formats.
+/// cmd_output_t is also a factory for derived classes with specialisations.
+///
 struct cmd_output_t {
     uint32_t indent_;
+
+    /// Create a cmd_output_t instance that will write directly to a file descriptor.
+    ///
+    /// - FILE* fd, the file descriptior that all output will be written to
+    static cmd_output_t* create_output_stdio(FILE* fd);
 
     /* auto indent control class */
     struct indent_t {
@@ -40,18 +50,16 @@ struct cmd_output_t {
             *ptr += indent;
         }
 
-        indent_t() = delete;
+        ~indent_t()
+        {
+            assert(ptr_);
+            *ptr_ = restore_;
+        }
 
         void add(uint32_t num)
         {
             assert(ptr_);
             *ptr_ += num;
-        }
-
-        ~indent_t()
-        {
-            assert(ptr_);
-            *ptr_ = restore_;
         }
 
     protected:
@@ -157,6 +165,16 @@ struct cmd_locale_t {
     static void subcommands(cmd_output_t& out)
     {
         out.println(true, "subcomands:");
+    }
+
+    static void unable_to_find_cmd(cmd_output_t& out, const char* cmd)
+    {
+        out.println(true, "unable to find command '%s'", cmd);
+    }
+
+    static void num_aliases(cmd_output_t& out, uint64_t num)
+    {
+        num ? out.println(true, "%d aliases:", (uint32_t)num) : out.println(true, "no alises");
     }
 };
 
@@ -382,7 +400,12 @@ protected:
     std::set<std::string> flags_;
 };
 
-/* command base class */
+/// cmd_t, the command base class
+///
+/// this is the base command class that should be extended to handle custom commands
+/// a cmd_t can be a child of another command or inserted into a cmd_parser_t as a root command
+/// two key methods can be overriden, on_execute and on_usage which the cmd_parser_t will invoke based on user input
+///
 struct cmd_t {
     // command name
     const char* const name_;
@@ -398,7 +421,11 @@ struct cmd_t {
     const char* usage_;
     const char* desc_;
 
-    /* mandatory constructor */
+    /// cmd_t constructor
+    ///
+    /// const char* name, the name of this command
+    /// cmd_t* parent, the parent cmd_t instance
+    /// cmd_baton_t user, the opaque user data passed to this cmd_t instance
     cmd_t(const char* name,
         cmd_parser_t& parser,
         cmd_t* parent,
@@ -413,14 +440,23 @@ struct cmd_t {
     {
     }
 
-    /* add a new subcommand */
+    /// Add child command
+    ///  instanciate and attach a new child command to this parent command
+    ///  supplying this commands user_ data during its construction.
+    ///
+    /// - return, the new cmd_t instance
     template <typename type_t>
     type_t* add_sub_command()
     {
         return add_sub_command<type_t>(user_);
     }
 
-    /* add a new subcommand */
+    /// Add child command
+    /// instanciate and attach a new child command to this parent command
+    ///
+    /// - cmd_baton_t user, opaque user data to pass to the new child cmd_t
+    ///
+    /// - return, the new cmd_t instance
     template <typename type_t>
     type_t* add_sub_command(cmd_baton_t user)
     {
@@ -429,9 +465,17 @@ struct cmd_t {
         return (type_t*)sub_.rbegin()->get();
     }
 
+    /// Command execution handler
+    ///
+    /// - cmd_tokens_t& tok, token list of arguments supplied by the user
+    /// - cmd_output_t& out, text output stream for writing results to
+    ///
+    /// - return, true if the command was interpreted successfully
     virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out);
 
-    /* return hierarchy of parent commands */
+    /// Return string with hierarchy of parent commands
+    ///
+    /// - std::string& out, string to store output hierarchy
     void get_command_path(std::string& out) const
     {
         if (parent_) {
@@ -441,7 +485,11 @@ struct cmd_t {
         out.append(name_);
     }
 
-    /* print command usage */
+    /// Print command usage information to output stream
+    ///
+    /// - cmd_output_t& out, output stream to print to
+    ///
+    /// - return, true if usage was written successfully
     virtual bool on_usage(cmd_output_t& out) const
     {
         cmd_output_t::indent_t indent = out.indent_push(2);
@@ -456,8 +504,19 @@ struct cmd_t {
     }
 
 protected:
+    /// Add an alias for this command
+    ///
+    /// - const std::string& name, the string name of the alias to add
+    ///
+    /// - return, true if the alias was associated successfully
     bool alias_add(const std::string& name);
 
+    /// Report an error condition to the output stream
+    ///
+    /// - const char* fmt, format string
+    /// - ..., var args
+    ///
+    /// - return, false so it can be propagated via return statements easily
     bool error(cmd_output_t& out, const char* fmt, ...)
     {
         va_list args;
@@ -467,6 +526,7 @@ protected:
         return false;
     }
 
+    /// 
     void print_cmd_list(const cmd_list_t& list, cmd_output_t& out) const
     {
         cmd_output_t::indent_t indent = out.indent_push(2);
@@ -481,33 +541,54 @@ protected:
     }
 };
 
-/* command parser */
+/// cmd_parser_t, the command parer
+/// this type is the main workhorse of the command library.  it forms the root of the command hieararchy
+/// it stores some state that can be accessed via all commands (alias_, idents_)
+/// cmd_parser_t is responsible for parsing and dispatching user input to the appropriate command
+/// 
 struct cmd_parser_t {
+
+    /// global user data passed to new subcommands unless overridden
     void* user_;
+
+    /// root subcommand list
     cmd_list_t sub_;
-    std::map<std::string, cmd_t*> alias_;
+
+    /// user input history
     std::vector<std::string> history_;
-    // identifiers
+
+    /// map of alias names to command instances
+    std::map<std::string, cmd_t*> alias_;
+
+    /// expression identifier list
     cmd_idents_t idents_;
 
+    /// cmd_parser_t constructor
+    ///
+    /// cmd_baton_t user, a global custom data pointer to be passed to any sub commands
     cmd_parser_t(cmd_baton_t user = nullptr)
         : user_(user)
     {
     }
 
+    /// Get a string with the last user input to be executed.
     const std::string& last_cmd() const
     {
         return history_.back();
     }
 
-    /* add new command */
+    /// Add a new root command to the command parser
+    ///
+    /// the new subcommand instance will be passed the global cmd_parser_t user_ data
     template <typename type_t>
     type_t* add_command()
     {
         return add_command<type_t>(user_);
     }
 
-    /* add new command */
+    /// Add a new root command to the command parser
+    ///
+    /// - cmd_baton_t user, the user data type to pass to the sub command
     template <typename type_t>
     type_t* add_command(cmd_baton_t user)
     {
@@ -517,24 +598,34 @@ struct cmd_parser_t {
         return (type_t*)sub_.rbegin()->get();
     }
 
-    /* execute expression */
+    /// Execute a command expression, calling the relevant cmd_t instance with
+    /// 
+    /// - const std::string& expr, string expression to execute
+    /// - cmd_output_t* output, output stream used during execution
     bool execute(const std::string& expr, cmd_output_t* output);
 
-    /* find partial substring */
-    bool find(const std::string& expr,
-        std::vector<std::string>& out);
-
-    /* alias control */
+    /// Add a new parser alias for a cmd_t instance.
+    ///
+    /// - cmd_t* cmd, command instance for which to make an alias
+    /// - const std::string& alias, name for the alias
     bool alias_add(cmd_t* cmd, const std::string& alias);
+
+    /// Remove a previously registered command alias byt name
+    ///
+    /// - const std::string& alias, the string command alias to remove
     bool alias_remove(const std::string& alias);
+
+    /// Remove any previously registered command alises by target cmd_t
+    ///
+    /// - const cmd_t* cmd, the cmd_t instance to remove any alises to
     bool alias_remove(const cmd_t* cmd);
 
+    /// Find a cmd_t instance given its alias name
+    ///
+    /// - const std::string& alias, the string alias to search for an associated cmd_t instance
     cmd_t* alias_find(const std::string& alias) const
     {
         auto itt = alias_.find(alias);
         return itt == alias_.end() ? nullptr : itt->second;
     }
-
-    /* create output stream to file descriptor */
-    cmd_output_t* create_output_stdio(FILE* fd);
 };

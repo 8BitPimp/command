@@ -30,7 +30,7 @@ int main(const int argc, const char** args)
     parser.add_command<cmd_expr_t>();
     parser.add_command<cmd_history_t>();
     // create output stream
-    std::unique_ptr<cmd_output_t> out(parser.create_output_stdio(stdout));
+    std::unique_ptr<cmd_output_t> out(cmd_output_t::create_output_stdio(stdout));
     // REPL (read-eval-print loop)
     out->print(false, "> ");
     while (fgets(buffer.data(), buffer.size(), stdin)) {

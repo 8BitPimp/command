@@ -7,7 +7,8 @@ struct cmd_alias_t : public cmd_t {
         cmd_alias_add_t(cmd_parser_t& cli, cmd_t* parent, cmd_baton_t user)
             : cmd_t("add", cli, parent, user)
         {
-            usage_ = "alias_name cmd [cmd ...]";
+            usage_ = "name cmd [cmd ...]";
+            desc_ = "alias a command with a single name";
         }
 
         static cmd_t* cmd_find(const cmd_tokens_t& tokens, const cmd_list_t* list)
@@ -45,7 +46,7 @@ struct cmd_alias_t : public cmd_t {
                 // lookup a command for the remaining tokens
                 cmd_t* cmd = cmd_find(tok, &(parser_.sub_));
                 if (cmd == nullptr) {
-                    return error(out, "  unable to locate command for '%s'", "todo");
+                    return error(out, "  unable to locate command for '%s'", name.c_str());
                 }
                 parser_.alias_add(cmd, name);
                 return true;
@@ -58,6 +59,8 @@ struct cmd_alias_t : public cmd_t {
         cmd_alias_remove_t(cmd_parser_t& cli, cmd_t* parent, cmd_baton_t user)
             : cmd_t("remove", cli, parent, user)
         {
+            usage_ = "name";
+            desc_ = "remove a previously registered alias";
         }
 
         virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
@@ -73,17 +76,20 @@ struct cmd_alias_t : public cmd_t {
         cmd_alias_list_t(cmd_parser_t& cli, cmd_t* parent, cmd_baton_t user)
             : cmd_t("list", cli, parent, user)
         {
+            desc_ = "list all registered aliases";
         }
 
         virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
         {
-            out.println("  %d aliases", parser_.alias_.size());
+            cmd_output_t::indent_t indent = out.indent_push(2);
+            out.println(true, "%d aliases", parser_.alias_.size());
+            indent.add(2);
             std::string path;
             for (auto itt : parser_.alias_) {
                 const cmd_t* cmd = itt.second;
                 path.clear();
                 cmd->get_command_path(path);
-                out.println("    %8s - %s", itt.first.c_str(), path.c_str());
+                out.println(true, "%8s - %s", itt.first.c_str(), path.c_str());
             }
             return true;
         }
@@ -95,5 +101,6 @@ struct cmd_alias_t : public cmd_t {
         add_sub_command<cmd_alias_add_t>(user);
         add_sub_command<cmd_alias_remove_t>(user);
         add_sub_command<cmd_alias_list_t>(user);
+        desc_ = "manage command aliases";
     }
 };

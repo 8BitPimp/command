@@ -27,97 +27,136 @@ struct cmd_util_t {
 
 /* command output writer */
 struct cmd_output_t {
-    FILE* fd_;
+    uint32_t indent_;
+
+    /* auto indent control class */
+    struct indent_t {
+
+        indent_t(uint32_t* ptr, uint32_t indent)
+            : ptr_(ptr)
+            , restore_(*ptr)
+        {
+            assert(ptr);
+            *ptr += indent;
+        }
+
+        indent_t() = delete;
+
+        void add(uint32_t num)
+        {
+            assert(ptr_);
+            *ptr_ += num;
+        }
+
+        ~indent_t()
+        {
+            assert(ptr_);
+            *ptr_ = restore_;
+        }
+
+    protected:
+        uint32_t* ptr_;
+        uint32_t restore_;
+    };
+
+    /* output mutex guard */
+    struct guard_t {
+        cmd_output_t& out_;
+        guard_t(cmd_output_t& out)
+            : out_(out)
+        {
+            out.lock();
+        }
+
+        ~guard_t()
+        {
+            out_.unlock();
+        }
+    };
+
+    guard_t guard()
+    {
+        return guard_t(*this);
+    }
 
     cmd_output_t()
-        : fd_(stdout)
+        : indent_(2)
     {
     }
 
-    void indent(const uint32_t num)
+    virtual ~cmd_output_t() {}
+
+    virtual void lock() = 0;
+    virtual void unlock() = 0;
+
+    indent_t indent_push(uint32_t next)
     {
-        for (uint32_t i = 0; i < num; ++i) {
-            fputc(' ', fd_);
-        }
+        return indent_t(&indent_, next);
     }
 
-    void print(const char* fmt, ...)
-    {
-        va_list args;
-        va_start(args, fmt);
-        vfprintf(fd_, fmt, args);
-        va_end(args);
-    }
+    virtual void indent() = 0;
 
-    void println(const char* fmt, ...)
-    {
-        va_list args;
-        va_start(args, fmt);
-        vfprintf(fd_, fmt, args);
-        va_end(args);
-        eol();
-    }
+    virtual void print(bool indent, const char* fmt, ...) = 0;
 
-    void println(const char* fmt, va_list& args)
-    {
-        vfprintf(fd_, fmt, args);
-        eol();
-    }
+    virtual void println(bool indent, const char* fmt, ...) = 0;
+    virtual void println(bool indent, const char* fmt, va_list& args) = 0;
 
-    void eol()
-    {
-        fputc('\n', fd_);
-    }
+    virtual void eol() = 0;
 };
 
 /* command locale text definitions */
 struct cmd_locale_t {
     static void possible_completions(cmd_output_t& out)
     {
-        out.println("  possible completions:");
+        out.println(true, "possible completions:");
     }
 
     static void invalid_command(cmd_output_t& out)
     {
-        out.println("  invalid command");
+        out.println(true, "invalid command");
     }
 
     static void no_subcommand(cmd_output_t& out, const char* cmd)
     {
-        out.println("  no subcommand '%s'", cmd);
+        out.println(true, "no subcommand '%s'", cmd);
     }
 
     static void did_you_meen(cmd_output_t& out)
     {
-        out.println("  did you meen:");
+        out.println(true, "did you meen:");
     }
 
     static void not_val_or_ident(cmd_output_t& out)
     {
-        out.println("  return type not value or identifier");
+        out.println(true, "return type not value or identifier");
     }
 
     static void unknown_ident(cmd_output_t& out, const char* ident)
     {
-        out.println("  unknown identifier '%s'", ident);
+        out.println(true, "unknown identifier '%s'", ident);
     }
 
     static void malformed_exp(cmd_output_t& out)
     {
-        out.println("  malformed expression");
+        out.println(true, "malformed expression");
     }
 
     static void error(cmd_output_t& out, const char* err)
     {
-        out.println("  error: %s", err);
+        out.println(true, "error: %s", err);
     }
 
     static void usage(cmd_output_t& out, const char* path, const char* args, const char* desc)
     {
-        out.println("  usage: %s %s", path, args ? args : "");
+        out.println(true, "usage: %s %s", path, args ? args : "");
         if (desc) {
-            out.println("  %s", desc);
+            out.println(true, "desc:  %s", desc);
         }
+    }
+
+    static void subcommands(cmd_output_t& out)
+    {
+        out.println(true, "subcomands:");
     }
 };
 
@@ -145,7 +184,7 @@ struct cmd_token_t {
         if (!cmd_util_t::strtoll(token_.c_str(), value, neg)) {
             return false;
         }
-        out = static_cast<type_t>(neg ? -value : value);
+        out = static_cast<type_t>(neg ? 0 - value : value);
         return true;
     }
 
@@ -206,6 +245,16 @@ struct cmd_tokens_t {
         if (!tokens_.front().get(out)) {
             return false;
         }
+        tokens_.pop_front();
+        return true;
+    }
+
+    bool get(cmd_token_t& out)
+    {
+        if (tokens_.empty()) {
+            return false;
+        }
+        out = tokens_.front();
         tokens_.pop_front();
         return true;
     }
@@ -289,14 +338,6 @@ struct cmd_tokens_t {
         assert(!"FIXME: failed to pop");
         return false;
     }
-
-#if 0
-    /* test if a token exists */
-    bool token_exists(uint32_t index) const
-    {
-        return tokens_.size() > index;
-    }
-#endif
 
     const std::deque<cmd_token_t>& tokens() const
     {
@@ -403,10 +444,15 @@ struct cmd_t {
     /* print command usage */
     virtual bool on_usage(cmd_output_t& out) const
     {
+        cmd_output_t::indent_t indent = out.indent_push(2);
         std::string path;
         get_command_path(path);
         cmd_locale_t::usage(out, path.c_str(), usage_, desc_);
-        return usage_ != nullptr;
+        if (!sub_.empty()) {
+            cmd_locale_t::subcommands(out);
+            print_sub_commands(out);
+        }
+        return true;
     }
 
 protected:
@@ -416,15 +462,16 @@ protected:
     {
         va_list args;
         va_start(args, fmt);
-        out.println(fmt, args);
+        out.println(true, fmt, args);
         va_end(args);
         return false;
     }
 
     void print_cmd_list(const cmd_list_t& list, cmd_output_t& out) const
     {
+        cmd_output_t::indent_t indent = out.indent_push(2);
         for (const auto& cmd : list) {
-            out.println("  %s", cmd->name_);
+            out.println(true, "%s", cmd->name_);
         }
     }
 
@@ -471,7 +518,7 @@ struct cmd_parser_t {
     }
 
     /* execute expression */
-    bool execute(const std::string& expr, cmd_output_t& output);
+    bool execute(const std::string& expr, cmd_output_t* output);
 
     /* find partial substring */
     bool find(const std::string& expr,
@@ -487,4 +534,7 @@ struct cmd_parser_t {
         auto itt = alias_.find(alias);
         return itt == alias_.end() ? nullptr : itt->second;
     }
+
+    /* create output stream to file descriptor */
+    cmd_output_t* create_output_stdio(FILE* fd);
 };

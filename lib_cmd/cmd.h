@@ -112,9 +112,12 @@ struct cmd_locale_t {
         out.println("  error: %s", err);
     }
 
-    static void usage(cmd_output_t& out, const char* path, const char* args)
+    static void usage(cmd_output_t& out, const char* path, const char* args, const char* desc)
     {
         out.println("  usage: %s %s", path, args ? args : "");
+        if (desc) {
+            out.println("  %s", desc);
+        }
     }
 };
 
@@ -183,6 +186,28 @@ struct cmd_tokens_t {
     size_t token_size() const
     {
         return tokens_.size();
+    }
+
+    bool get(std::string& out)
+    {
+        if (tokens_.empty()) {
+            return false;
+        }
+        out = tokens_.front().get();
+        tokens_.pop_front();
+        return true;
+    }
+
+    bool get(uint64_t& out)
+    {
+        if (tokens_.empty()) {
+            return false;
+        }
+        if (!tokens_.front().get(out)) {
+            return false;
+        }
+        tokens_.pop_front();
+        return true;
     }
 
     bool flag_get(const std::string& name) const
@@ -265,11 +290,13 @@ struct cmd_tokens_t {
         return false;
     }
 
+#if 0
     /* test if a token exists */
     bool token_exists(uint32_t index) const
     {
         return tokens_.size() > index;
     }
+#endif
 
     const std::deque<cmd_token_t>& tokens() const
     {
@@ -328,6 +355,7 @@ struct cmd_t {
     cmd_list_t sub_;
     // command usage
     const char* usage_;
+    const char* desc_;
 
     /* mandatory constructor */
     cmd_t(const char* name,
@@ -340,6 +368,7 @@ struct cmd_t {
         , parent_(parent)
         , sub_()
         , usage_(nullptr)
+        , desc_(nullptr)
     {
     }
 
@@ -376,8 +405,7 @@ struct cmd_t {
     {
         std::string path;
         get_command_path(path);
-        cmd_locale_t::usage(out, path.c_str(), usage_);
-        out.eol();
+        cmd_locale_t::usage(out, path.c_str(), usage_, desc_);
         return usage_ != nullptr;
     }
 

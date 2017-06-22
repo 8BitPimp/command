@@ -379,16 +379,23 @@ struct cmd_tokens_t {
         return pairs_;
     }
 
+    /// @brief Return a set containing all user supplied flags
     const std::set<std::string>& flags() const
     {
         return flags_;
     }
 
+    /// @brief Return a list of raw tokens pushed to the token list
+    ///
+    /// @return queue of raw tokens pushed to this token list
     const std::deque<cmd_token_t>& raw() const
     {
         return raw_;
     }
 
+    /// @brief Find a matching token in the token list
+    ///
+    /// @param in input string to try and locate in the token list
     const bool token_find(const std::string& in) const
     {
         for (const cmd_token_t& tok : tokens_) {
@@ -412,11 +419,11 @@ protected:
     std::set<std::string> flags_;
 };
 
-/// cmd_t, the command base class
+/// @brief cmd_t, the command base class.
 ///
-/// this is the base command class that should be extended to handle custom commands
-/// a cmd_t can be a child of another command or inserted into a cmd_parser_t as a root command
-/// two key methods can be overriden, on_execute and on_usage which the cmd_parser_t will invoke based on user input
+/// this is the base command class that should be extended to handle custom commands.
+/// a cmd_t can be a child of another command or inserted into a cmd_parser_t as a root command.
+/// two key methods can be overriden, on_execute and on_usage which the cmd_parser_t will invoke based on user input.
 ///
 struct cmd_t {
     /// command name
@@ -434,7 +441,7 @@ struct cmd_t {
     /// command description string
     const char* desc_;
 
-    /// cmd_t constructor
+    /// @brief cmd_t constructor.
     ///
     /// @param const char* name, the name of this command
     /// @param cmd_t* parent, the parent cmd_t instance
@@ -453,7 +460,7 @@ struct cmd_t {
     {
     }
 
-    /// Add child command
+    /// @brief Add child command to this command.
     ///
     /// instanciate and attach a new child command to this parent command
     /// supplying this commands user_ data during its construction.
@@ -465,7 +472,7 @@ struct cmd_t {
         return add_sub_command<type_t>(user_);
     }
 
-    /// Add child command
+    /// @brief Add child command to this command.
     ///
     /// instanciate and attach a new child command to this parent command.
     ///
@@ -479,7 +486,7 @@ struct cmd_t {
         return (type_t*)sub_.rbegin()->get();
     }
 
-    /// Command execution handler
+    /// @brief Command execution handler.
     ///
     /// virtual function that will be called when the user specifies is full path or an alias to this command.
     /// if this command is ternimal then any following input tokens will be passed to this handler.
@@ -490,7 +497,7 @@ struct cmd_t {
     /// @return true if the command executed successfully.
     virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out);
 
-    /// Return string with hierarchy of parent commands
+    /// Return string with hierarchy of parent commands.
     ///
     /// @param out the string to store output hierarchy.
     void get_command_path(std::string& out) const
@@ -502,7 +509,7 @@ struct cmd_t {
         out.append(name_);
     }
 
-    /// Print command usage information to output stream
+    /// @brief Print command usage information to output stream.
     ///
     /// @param out output stream to print to
     /// @return true if usage was written successfully
@@ -520,7 +527,7 @@ struct cmd_t {
     }
 
 protected:
-    /// Add an alias for this command
+    /// @brief Add an alias for this command.
     ///
     /// bind a cmt_t instance to a single string token known as an alias.
     /// during command interpretation if the first token matches any alises then the associated cmd_t instance will be executed.
@@ -529,7 +536,7 @@ protected:
     /// @return true if the alias was associated successfully.
     bool alias_add(const std::string& name);
 
-    /// Report an error condition to the output stream
+    /// @brief Report an error condition to the output stream.
     ///
     /// @param out output stream.
     /// @param fmt input format string.
@@ -544,7 +551,7 @@ protected:
         return false;
     }
 
-    /// Print a list of command names to an output stream
+    /// @brief Print a list of command names to an output stream.
     ///
     /// @param list input command list.
     /// @param out output stream to write command names to.
@@ -556,13 +563,16 @@ protected:
         }
     }
 
+    /// @brief Print a list of child commands to the output stream.
+    ///
+    /// @param out output stream to write command names to.
     void print_sub_commands(cmd_output_t& out) const
     {
         print_cmd_list(sub_, out);
     }
 };
 
-/// cmd_parser_t, the command parer
+/// cmd_parser_t, the command parser.
 ///
 /// this type is the main workhorse of the command library.  it forms the root of the command hieararchy
 /// it stores some state that can be accessed via all commands (alias_, idents_)
@@ -585,7 +595,7 @@ struct cmd_parser_t {
     /// expression identifier list
     cmd_idents_t idents_;
 
-    /// cmd_parser_t constructor
+    /// cmd_parser_t constructor.
     ///
     /// @param user opaque user data pointer passed from parent to child.
     /// @return user a global custom data pointer to be passed to any sub commands.
@@ -594,7 +604,7 @@ struct cmd_parser_t {
     {
     }
 
-    /// Get a string with the last user input to be executed.
+    /// @brief Get a string with the last user input to be executed.
     ///
     /// @return reference to the last 
     const std::string& last_cmd() const
@@ -602,7 +612,7 @@ struct cmd_parser_t {
         return history_.back();
     }
 
-    /// Add a new root command to the command parser
+    /// @brief Add a new root command to the command parser.
     ///
     /// add a new root command to the command interpreter.
     /// the new subcommand instance will be passed the global cmd_parser_t user_ data
@@ -614,7 +624,7 @@ struct cmd_parser_t {
         return add_command<type_t>(user_);
     }
 
-    /// Add a new root command to the command parser
+    /// @brief Add a new root command to the command parser.
     ///
     /// @param user the user data type to pass to the sub command.
     /// @return instance of the newly created command.
@@ -627,33 +637,33 @@ struct cmd_parser_t {
         return (type_t*)sub_.rbegin()->get();
     }
 
-    /// Execute a command expression, calling the relevant cmd_t instance with
+    /// @brief Execute expressions, calling the relevant cmd_t instances with arguments.
     ///
-    /// @param expr string expression to execute.
+    /// @param a list of ';' delimited expression strings to execute.
     /// @param output output stream that can be written to during execution.
     /// @return true if the command executed successfully.
     bool execute(const std::string& expr, cmd_output_t* output);
 
-    /// Add a new parser alias for a cmd_t instance.
+    /// @brief Add a new parser alias for a cmd_t instance.
     ///
     /// @param cmd command instance for which to make an alias.
     /// @param alias name for the alias.
     /// @return true if that alias was added.
     bool alias_add(cmd_t* cmd, const std::string& alias);
 
-    /// Remove a previously registered command alias byt name
+    /// @brief Remove a previously registered command alias byt name.
     ///
     /// @param alias the string command alias to remove.
     /// @return true if the alias was removed.
     bool alias_remove(const std::string& alias);
 
-    /// Remove any previously registered command alises by target cmd_t
+    /// @brief Remove any previously registered command alises by target cmd_t.
     ///
     /// @param cmd the cmd_t instance to remove any alises to.
     /// @return true if the alias was removed.
     bool alias_remove(const cmd_t* cmd);
 
-    /// Find a cmd_t instance given its alias name
+    /// @brief Find a cmd_t instance given its alias name.
     ///
     /// @param alias the string alias to search for an associated cmd_t instance.
     /// @return cmd_t instance linked to this alias otherwise nullptr.
@@ -664,6 +674,10 @@ struct cmd_parser_t {
     }
 
 protected:
-    /* execute expression */
-    bool execute_imp(const std::string& expr, cmd_output_t& output);
+    /// @brief Execute a command expression, calling the relevant cmd_t instance with arguments.
+    ///
+    /// @param expression string to execute.
+    /// @param output output stream that can be written to during execution.
+    /// @return true if the command executed successfully.
+    bool execute_imp(const std::string& expr, cmd_output_t* output);
 };

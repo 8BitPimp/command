@@ -165,8 +165,8 @@ bool cmd_parser_t::execute(const std::string& expr, cmd_output_t* cmd_out)
         }
         // execute single command
         if (!cmd.empty()) {
-            if (!execute_imp(cmd, output)) {
-                return cmd_locale_t::command_failed(output, cmd.c_str()), false;
+            if (!execute_imp(cmd, cmd_out)) {
+                return cmd_locale_t::command_failed(out, cmd.c_str()), false;
             }
         }
     }

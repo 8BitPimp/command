@@ -7,25 +7,25 @@ struct cmd_help_t : public cmd_t {
         cmd_help_tree_t(cmd_parser_t& cli, cmd_t* parent, cmd_baton_t user)
             : cmd_t("tree", cli, parent, user)
         {
-            usage_ = R"(list all commands and their sub commands)";
+            desc_ = "list all commands and their sub commands";
             parser_.history_.push_back("help");
         }
 
-        void walk(const cmd_list_t& list, cmd_output_t& out, uint32_t indent)
+        void walk(const cmd_list_t& list, cmd_output_t& out)
         {
+            cmd_output_t::indent_t indent = out.indent_push(2);
             for (const auto& cmd : list) {
-                out.indent(indent);
-                out.println(cmd->name_);
+                out.println(true, cmd->name_);
                 assert(cmd);
                 if (!cmd->sub_.empty()) {
-                    walk(cmd->sub_, out, indent + 2);
+                    walk(cmd->sub_, out);
                 }
             }
         }
 
         virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
         {
-            walk(parser_.sub_, out, 2);
+            walk(parser_.sub_, out);
             return true;
         }
     };
@@ -33,7 +33,7 @@ struct cmd_help_t : public cmd_t {
     cmd_help_t(cmd_parser_t& cli, cmd_t* parent, cmd_baton_t user)
         : cmd_t("help", cli, parent, user)
     {
-        usage_ = R"(list all commands)";
+        desc_ = "list all root commands";
         add_sub_command<cmd_help_tree_t>();
     }
 

@@ -566,6 +566,7 @@ protected:
 
 bool cmd_expr_t::cmd_expr_eval_t::on_execute(cmd_tokens_t& tok, cmd_output_t& out)
 {
+    cmd_output_t::indent_t indent = out.indent_push(2);
     // turn arguments into expression string
     std::string expr;
     if (!join_expr(tok, expr)) {
@@ -576,9 +577,9 @@ bool cmd_expr_t::cmd_expr_eval_t::on_execute(cmd_tokens_t& tok, cmd_output_t& ou
     if (!state.evaluate(expr)) {
         return state.error_.print(out), false;
     }
+    indent.add(2);
     // print results
     for (const exp_token_t& val : state.stack_) {
-        out.print("  ");
         switch (val.type_) {
         case exp_token_t::e_identifier: {
             auto& idents = state.idents_;
@@ -590,12 +591,12 @@ bool cmd_expr_t::cmd_expr_eval_t::on_execute(cmd_tokens_t& tok, cmd_output_t& ou
                 // print key value pair
                 const std::string& key = itt->first;
                 const uint64_t& value = itt->second;
-                out.println("  %s = 0x%llx", key.c_str(), value);
+                out.println(true, "%s = 0x%llx", key.c_str(), value);
             }
             break;
         }
         case exp_token_t::e_value:
-            out.println("  0x%llx", val.value_);
+            out.println(true, "0x%llx", val.value_);
             break;
         default:
             return cmd_locale_t::not_val_or_ident(out), false;

@@ -1,5 +1,6 @@
 #include <cassert>
 #include <limits.h>
+#include <mutex>
 
 #include "cmd.h"
 
@@ -140,8 +141,12 @@ uint32_t cmd_util_t::levenshtein(const char* s1, const char* s2)
 
 // ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- cmd_parser_t
 
-bool cmd_parser_t::execute(const std::string& expr, cmd_output_t& output)
+bool cmd_parser_t::execute(const std::string& expr, cmd_output_t* cmd_out)
 {
+    assert(cmd_out);
+    cmd_output_t& out = *cmd_out;
+    // aquire the output guard
+    const auto guard = out.guard();
     const char delimiter = ';';
     size_t ix = 0;
     std::string cmd;
@@ -168,8 +173,10 @@ bool cmd_parser_t::execute(const std::string& expr, cmd_output_t& output)
     return true;
 }
 
-bool cmd_parser_t::execute_imp(const std::string& expr, cmd_output_t& out)
+bool cmd_parser_t::execute_imp(const std::string& expr, cmd_output_t* cmd_out)
 {
+    assert(cmd_out);
+    cmd_output_t& out = *cmd_out;
     const std::string prev_cmd = last_cmd();
     // add to history buffer
     history_.push_back(expr);
@@ -178,7 +185,7 @@ bool cmd_parser_t::execute_imp(const std::string& expr, cmd_output_t& out)
     if (tokenize(expr.c_str(), tokens) == 0) {
         if (!last_cmd().empty()) {
             out.println("> %s", prev_cmd.c_str());
-            return execute_imp(prev_cmd, out);
+            return execute_imp(prev_cmd, cmd_out);
         } else {
             // no commands entered
             return false;
@@ -204,11 +211,12 @@ bool cmd_parser_t::execute_imp(const std::string& expr, cmd_output_t& out)
                 // remove front item
                 tokens.token_pop();
             } else {
-                // ambiguous matches
+                // ambiguous matches (show possible matches)
                 cmd = nullptr;
                 cmd_locale_t::possible_completions(out);
+                cmd_output_t::indent_t indent = out.indent_push(4);
                 for (auto c : cmd_vec) {
-                    out.println("    %s", c->name_);
+                    out.println(true, "%s", c->name_);
                 }
                 break;
             }
@@ -225,14 +233,6 @@ bool cmd_parser_t::execute_imp(const std::string& expr, cmd_output_t& out)
     } else {
         cmd_locale_t::invalid_command(out);
     }
-    return false;
-}
-
-bool cmd_parser_t::find(const std::string& expr,
-    std::vector<std::string>& out)
-{
-    (void)expr;
-    (void)out;
     return false;
 }
 
@@ -302,4 +302,70 @@ bool cmd_t::on_execute(cmd_tokens_t& tok, cmd_output_t& out)
 bool cmd_t::alias_add(const std::string& name)
 {
     return parser_.alias_add(this, name);
+}
+
+// ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- cmd_output_stdio_t
+
+struct cmd_output_stdio_t : public cmd_output_t {
+    FILE* fd_;
+    std::mutex mux_;
+
+    cmd_output_stdio_t(FILE* fd)
+        : fd_(fd)
+        , cmd_output_t()
+    {
+    }
+
+    virtual void lock() override
+    {
+        mux_.lock();
+    }
+
+    virtual void unlock() override
+    {
+        mux_.unlock();
+    }
+
+    virtual void indent() override
+    {
+        for (uint32_t i = 0; i < indent_; ++i) {
+            fputc(' ', fd_);
+        }
+    }
+
+    virtual void print(bool ind, const char* fmt, ...) override
+    {
+        ind ? indent() : (void)0;
+        va_list args;
+        va_start(args, fmt);
+        vfprintf(fd_, fmt, args);
+        va_end(args);
+    }
+
+    virtual void println(bool ind, const char* fmt, ...) override
+    {
+        ind ? indent() : (void)0;
+        va_list args;
+        va_start(args, fmt);
+        vfprintf(fd_, fmt, args);
+        va_end(args);
+        eol();
+    }
+
+    virtual void println(bool ind, const char* fmt, va_list& args) override
+    {
+        ind ? indent() : (void)0;
+        vfprintf(fd_, fmt, args);
+        eol();
+    }
+
+    virtual void eol() override
+    {
+        fputc('\n', fd_);
+    }
+};
+
+cmd_output_t* cmd_output_t::create_output_stdio(FILE* fd)
+{
+    return new cmd_output_stdio_t(fd);
 }

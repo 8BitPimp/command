@@ -116,6 +116,10 @@ struct cmd_locale_t {
     {
         out.println("  usage: %s %s", path, args ? args : "");
     }
+
+    static void command_failed(cmd_output_t& out, const char *cmd) {
+        out.println("  command failed: '%s'", cmd);
+    }
 };
 
 /* command argument token */
@@ -459,4 +463,8 @@ struct cmd_parser_t {
         auto itt = alias_.find(alias);
         return itt == alias_.end() ? nullptr : itt->second;
     }
+
+protected:
+    /* execute expression */
+    bool execute_imp(const std::string& expr, cmd_output_t& output);
 };

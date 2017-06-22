@@ -140,7 +140,35 @@ uint32_t cmd_util_t::levenshtein(const char* s1, const char* s2)
 
 // ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- cmd_parser_t
 
-bool cmd_parser_t::execute(const std::string& expr, cmd_output_t& out)
+bool cmd_parser_t::execute(const std::string& expr, cmd_output_t& output)
+{
+    const char delimiter = ';';
+    size_t ix = 0;
+    std::string cmd;
+    for (bool active = true; active;) {
+        cmd.clear();
+        // split by delimiter
+        const size_t next = expr.find(delimiter, ix);
+        if (next == expr.npos) {
+            cmd = expr.substr(ix);
+            active = false;
+        } else {
+            if (next > ix) {
+                cmd = expr.substr(ix, next - ix);
+            }
+            ix = next + 1;
+        }
+        // execute single command
+        if (!cmd.empty()) {
+            if (!execute_imp(cmd, output)) {
+                return cmd_locale_t::command_failed(output, cmd.c_str()), false;
+            }
+        }
+    }
+    return true;
+}
+
+bool cmd_parser_t::execute_imp(const std::string& expr, cmd_output_t& out)
 {
     const std::string prev_cmd = last_cmd();
     // add to history buffer
@@ -149,7 +177,8 @@ bool cmd_parser_t::execute(const std::string& expr, cmd_output_t& out)
     cmd_tokens_t tokens(&idents_);
     if (tokenize(expr.c_str(), tokens) == 0) {
         if (!last_cmd().empty()) {
-            return execute(prev_cmd, out);
+            out.println("> %s", prev_cmd.c_str());
+            return execute_imp(prev_cmd, out);
         } else {
             // no commands entered
             return false;

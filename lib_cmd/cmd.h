@@ -9,15 +9,23 @@
 #include <string>
 #include <vector>
 
+/// @brief cmd_list_t, list of cmd_t instances.
+///
 typedef std::vector<std::unique_ptr<struct cmd_t>> cmd_list_t;
+
+/// @brief cmd_idents_t, identfier list used for cmd_tokens_t substitutions.
+///
 typedef std::map<std::string, uint64_t> cmd_idents_t;
+
+/// @brief cmd_baton_t, baton used for passing user data to cm_t instances.
+///
 typedef void* cmd_baton_t;
 
-/// @brief cmd_util_t, utility functions for the command parser
+/// @brief cmd_util_t, utility functions for the command parser.
 ///
 struct cmd_util_t {
 
-    /// @brief convert string to 64 bit integer
+    /// @brief convert string to 64 bit integer.
     ///
     /// @param in input string to parse as integer
     /// @param out output integer to receive contersion
@@ -26,7 +34,7 @@ struct cmd_util_t {
     /// @return true if the conversion was successfull
     static bool strtoll(const char* in, uint64_t& out, bool& neg);
 
-    /// @brief levenshtein string distance function
+    /// @brief levenshtein string distance function.
     ///
     /// @param s1 input string a
     /// @param s2 input string b
@@ -34,13 +42,13 @@ struct cmd_util_t {
     /// @return edit distance between strings s1 and s2
     static uint32_t levenshtein(const char* a, const char* b);
 
-    /// @brief partial substring match
+    /// @brief partial substring match.
     ///
     /// @return number of characters between str and sub that match or -1 if different
     static int32_t str_match(const char* str, const char* sub);
 };
 
-/// @brief cmd_output_t, command output interface base class
+/// @brief cmd_output_t, command output interface base class.
 ///
 /// this class brokers all output text writing from cmd_t classes during command execution.
 /// using a specific class we can ensure consisten output and eliminate output race conditions.
@@ -49,13 +57,13 @@ struct cmd_util_t {
 ///
 struct cmd_output_t {
 
-    /// Create a cmd_output_t instance that will write directly to a file descriptor.
+    /// @brief Create a cmd_output_t instance that will write directly to a file descriptor.
     ///
     /// @param fd, the file descriptior that all output will be written to.
     /// @return cmd_output_t instance.
     static cmd_output_t* create_output_stdio(FILE* fd);
 
-    /// @brief indent_t, indent control helper class
+    /// @brief indent_t, indent control helper class.
     ///
     struct indent_t {
 
@@ -84,7 +92,7 @@ struct cmd_output_t {
         uint32_t restore_;
     };
 
-    /// @brief guard_t, output mutex helper class
+    /// @brief guard_t, output mutex helper class.
     ///
     struct guard_t {
         cmd_output_t& out_;
@@ -103,41 +111,44 @@ struct cmd_output_t {
         }
     };
 
-    /// @brief obtain scope guard for the output mutex
+    /// @brief obtain scope guard for the output mutex.
     ///
-    /// @return scope guard object for the output mutex
+    /// @return scope guard object for the output mutex.
     guard_t guard()
     {
         return guard_t(*this);
     }
 
-    /// @brief constructor
-    ///
+    /// @brief constructor.
     cmd_output_t()
         : indent_(2)
     {
     }
 
-    /// @brief virtual destructor
-    ///
+    /// @brief virtual destructor.
     virtual ~cmd_output_t() {}
 
-    /// @brief aquire the output mutex
-    ///
+    /// @brief aquire the output mutex.
     virtual void lock() = 0;
 
-    /// @brief release the output mutex
-    ///
+    /// @brief release the output mutex.
     virtual void unlock() = 0;
 
-    /// @brief push a new indentation level
+    /// @brief push a new indentation level.
     ///
-    /// @return indent helper class
+    /// @return indent helper class.
     indent_t indent(uint32_t next = 2)
     {
         return indent_t(&indent_, next);
     }
 
+    /// @brief print a format string into this output stream.
+    ///
+    /// print to output string without appending a new line.
+    ///
+    /// @param INDENT follow indentation marker from output string.
+    /// @param fmt format string.
+    /// @param variable length argument list.
     template <bool INDENT = true>
     void print(const char* fmt, ...)
     {
@@ -147,6 +158,13 @@ struct cmd_output_t {
         va_end(args);
     }
 
+    /// @brief print a format string into this output stream.
+    ///
+    /// print to output string and append a new line.
+    ///
+    /// @param INDENT follow indentation marker from output string.
+    /// @param fmt format string.
+    /// @param variable length argument list.
     template <bool INDENT = true>
     void println(const char* fmt, ...)
     {
@@ -159,14 +177,15 @@ struct cmd_output_t {
     virtual void print(bool indent, const char* fmt, va_list& args) = 0;
     virtual void println(bool indent, const char* fmt, va_list& args) = 0;
 
+    /// @brief Append an end of line character.
     virtual void eol() = 0;
 
 protected:
-    /// @brief current indentation level
+    /// @brief Current indentation level.
     uint32_t indent_;
 };
 
-/// @brief cmd_locale_t, command locale text definitions
+/// @brief cmd_locale_t, command locale text definitions.
 ///
 struct cmd_locale_t {
 
@@ -239,33 +258,38 @@ struct cmd_locale_t {
     }
 };
 
-/// @brief cmd_token_t, command arguement token
+/// @brief cmd_token_t, command arguement token.
+///
+/// User input is processed, it is parsed to form a list of tokens.  These
+/// tokens are encapsulated as a cmd_token_t.  A list of tokens is defined as
+/// the cmd_tokens_t type.  The cmd_token_t type makes it easier to convert
+/// string tokens between multiple data types.
 ///
 struct cmd_token_t {
 
-    /// @brief constructor
+    /// @brief constructor.
     cmd_token_t() = default;
 
-    /// @brief cmd_token_t consructor
+    /// @brief cmd_token_t constructor.
     ///
-    /// @param string token
+    /// @param string token.
     cmd_token_t(const std::string& string)
         : token_(string)
     {
     }
 
-    /// @brief return token as a string
+    /// @brief return token as a string.
     ///
-    /// @return underlying token string
+    /// @return underlying token string.
     const std::string& get() const
     {
         return token_;
     }
 
-    /// @brief get token as an integer
+    /// @brief get token as an integer.
     ///
-    /// @oaram output integer to store the conversion
-    /// @return true if the token represents an integer
+    /// @param output integer to store the conversion.
+    /// @return true if the token represents an integer.
     template <typename type_t>
     bool get(type_t& out) const
     {
@@ -278,36 +302,36 @@ struct cmd_token_t {
         return true;
     }
 
-    /// @brief test for token equality
+    /// @brief test for token equality.
     ///
-    /// @param rhs token to check equality with
-    /// @return true if tokens are equal
+    /// @param rhs token to check equality with.
+    /// @return true if tokens are equal.
     bool operator==(const cmd_token_t& rhs) const
     {
         return token_ == rhs.get();
     }
 
-    /// @brief test for token equality
+    /// @brief test for token equality.
     ///
-    /// @oaram rhs token to check equality with
-    /// @return true if token is equal to rhs
+    /// @param rhs token to check equality with.
+    /// @return true if token is equal to rhs.
     template <typename type_t>
     bool operator==(const type_t& rhs) const
     {
         return token_ == rhs;
     }
 
-    /// @brief std::string cast operator
+    /// @brief std::string cast operator.
     ///
-    /// @return token as string
+    /// @return token as string.
     operator std::string() const
     {
         return token_;
     }
 
-    /// @brief c string cast operator
+    /// @brief c string cast operator.
     ///
-    /// @return c string representataion of token
+    /// @return c string representataion of token.
     const char* c_str() const
     {
         return token_.c_str();
@@ -317,35 +341,35 @@ protected:
     std::string token_;
 };
 
-/// @breif cmd_tokens_t, command arguments token list
+/// @brief cmd_tokens_t, command arguments token list.
 ///
 struct cmd_tokens_t {
 
     struct {
-        /// @brief check if a flag was passed to the token list
+        /// @brief check if a flag was passed to the token list.
         ///
-        /// @return true if 'name' flag was passed as an argument
+        /// @return true if 'name' flag was passed as an argument.
         bool get(const std::string& name) const
         {
             return !(flags_.find(name) == flags_.end());
         }
 
-        /// @brief check if the flag set is empty
+        /// @brief check if the flag set is empty.
         ///
-        /// @return true if the flags set is empty, otherwise false
+        /// @return true if the flags set is empty, otherwise false.
         bool empty() const
         {
             return flags_.empty();
         }
 
-        /// @brief command token flags
+        /// @brief command token flags.
         std::set<std::string> flags_;
     } flags;
 
     struct {
-        /// @brief retreive the argument to a passed token pair
+        /// @brief retreive the argument to a passed token pair.
         ///
-        /// @return true if the pair was in the token list
+        /// @return true if the pair was in the token list.
         bool get(const std::string& name, cmd_token_t& out) const
         {
             auto itt = pairs_.find(name);
@@ -356,30 +380,30 @@ struct cmd_tokens_t {
             }
         }
 
-        /// @brief check if the pairs map is empty
+        /// @brief check if the pairs map is empty.
         ///
-        /// @return true if the pairs set is empty, otherwise false
+        /// @return true if the pairs set is empty, otherwise false.
         bool empty() const
         {
             return pairs_.empty();
         }
 
-        /// @brief key value pair arguments
+        /// @brief key value pair arguments.
         std::map<std::string, cmd_token_t> pairs_;
     } pairs;
 
     struct {
-        /// @brief return number of tokens in the token list
+        /// @brief return number of tokens in the token list.
         ///
-        /// @return number of tokens in the token list
+        /// @return number of tokens in the token list.
         size_t size() const
         {
             return tokens_.size();
         }
 
-        /// @brief get the front most token from the token list
+        /// @brief get the front most token from the token list.
         ///
-        /// @return true if the front most token could be retrived
+        /// @return true if the front most token could be retrived.
         bool get(std::string& out)
         {
             if (tokens_.empty()) {
@@ -390,10 +414,10 @@ struct cmd_tokens_t {
             return true;
         }
 
-        /// @brief get the front most token from the token list
+        /// @brief get the front most token from the token list.
         ///
-        /// @param output to receive front most token
-        /// @return true if the front most token could be retrived
+        /// @param output to receive front most token.
+        /// @return true if the front most token could be retrived.
         bool get(cmd_token_t& out)
         {
             if (tokens_.empty()) {
@@ -404,10 +428,10 @@ struct cmd_tokens_t {
             return true;
         }
 
-        /// @brief get the front most token from the token list as an integer
+        /// @brief get the front most token from the token list as an integer.
         ///
-        /// @param output to receive the front most token
-        /// @return true if the front most token could be interpreted as integer
+        /// @param output to receive the front most token.
+        /// @return true if the front most token could be interpreted as integer.
         bool get(uint64_t& out)
         {
             if (!tokens_.empty()) {
@@ -419,33 +443,33 @@ struct cmd_tokens_t {
             return false;
         }
 
-        /// @brief check if the token list is empty
+        /// @brief check if the token list is empty.
         ///
-        /// @return true if the token list is empty
+        /// @return true if the token list is empty.
         bool empty() const
         {
             return tokens_.empty();
         }
 
-        /// @brief return a reference to the first token in the queue
+        /// @brief return a reference to the first token in the queue.
         ///
-        /// @return reference to first token
+        /// @return reference to first token.
         const cmd_token_t& front() const
         {
             return tokens_.front();
         }
 
-        /// @brief return a reference to the last token in the queue
+        /// @brief return a reference to the last token in the queue.
         ///
-        /// @return reference to last token
+        /// @return reference to last token.
         const cmd_token_t& back() const
         {
             return tokens_.back();
         }
 
-        /// @brief pop front most argument from token list
+        /// @brief pop front most argument from token list.
         ///
-        /// @return true if front argument was popped
+        /// @return true if front argument was popped.
         bool pop()
         {
             if (!tokens_.empty()) {
@@ -461,9 +485,9 @@ struct cmd_tokens_t {
             return false;
         }
 
-        /// @brief Find a matching token in the token list
+        /// @brief Find a matching token in the token list.
         ///
-        /// @param in input string to try and locate in the token list
+        /// @param in input string to try and locate in the token list.
         const bool find(const std::string& in) const
         {
             for (const cmd_token_t& tok : tokens_) {
@@ -474,43 +498,43 @@ struct cmd_tokens_t {
             return false;
         }
 
-        /// @brief Accessor for the tokens deque
+        /// @brief Accessor for the tokens deque.
         std::deque<cmd_token_t>& operator()()
         {
             return tokens_;
         }
 
-        /// @brief basic token arguments
+        /// @brief basic token arguments.
         std::deque<cmd_token_t> tokens_;
-        /// @brief raw tokens
+        /// @brief raw tokens.
         std::deque<cmd_token_t> raw_;
     } tokens;
 
-    /// @brief constructor
+    /// @brief constructor.
     ///
-    /// @oaram idents list of identifiers to substitute tokens with
+    /// @param idents list of identifiers to substitute tokens with.
     cmd_tokens_t(cmd_idents_t* idents)
         : idents_(idents)
     {
     }
 
-    /// @brief tokenize and input stream into a cmd_tokens_t instance
+    /// @brief tokenize and input stream into a cmd_tokens_t instance.
     ///
-    /// @param in input stream to tokenize
-    /// @param out output cmd_tokens_t instance to populate
-    /// @return number of tokens parsed
+    /// @param in input stream to tokenize.
+    /// @param out output cmd_tokens_t instance to populate.
+    /// @return number of tokens parsed.
     size_t tokenize(const char* in);
 
 protected:
-    /// @brief push a new token into this token list
+    /// @brief push a new token into this token list.
     ///
-    /// @param string token to push onto list
+    /// @param string token to push onto list.
     void push(std::string input);
 
-    /// @brief list of identifiers that can be substituted for tokens
+    /// @brief list of identifiers that can be substituted for tokens.
     cmd_idents_t* idents_;
 
-    /// @brief staging area for pairs
+    /// @brief staging area for pairs.
     std::pair<std::string, cmd_token_t> stage_pair_;
 };
 
@@ -522,32 +546,32 @@ protected:
 ///
 struct cmd_t {
 
-    /// @brief command name
+    /// @brief command name.
     const char* const name_;
 
-    /// @brief owning command parser
+    /// @brief owning command parser.
     struct cmd_parser_t& parser_;
 
-    /// @brief opaque user data for this command
+    /// @brief opaque user data for this command.
     cmd_baton_t user_;
 
-    /// @brief the parent if this is a child command
+    /// @brief the parent if this is a child command.
     cmd_t* parent_;
 
-    /// @brief list of child commands
+    /// @brief list of child commands.
     cmd_list_t sub_;
 
-    /// @brief command argument string
+    /// @brief command argument string.
     const char* usage_;
 
-    /// @brief command description string
+    /// @brief command description string.
     const char* desc_;
 
     /// @brief cmd_t constructor.
     ///
-    /// @param const char* name, the name of this command
-    /// @param cmd_t* parent, the parent cmd_t instance
-    /// @param cmd_baton_t user, the opaque user data passed to this cmd_t instance
+    /// @param const char* name, the name of this command.
+    /// @param cmd_t* parent, the parent cmd_t instance.
+    /// @param cmd_baton_t user, the opaque user data passed to this cmd_t instance.
     cmd_t(const char* name,
         cmd_parser_t& parser,
         cmd_t* parent,
@@ -567,7 +591,7 @@ struct cmd_t {
     /// instanciate and attach a new child command to this parent command
     /// supplying this commands user_ data during its construction.
     ///
-    /// @ return the new cmd_t instance
+    /// @return the new cmd_t instance.
     template <typename type_t>
     type_t* add_sub_command()
     {
@@ -590,9 +614,9 @@ struct cmd_t {
 
     /// @brief Command execution handler.
     ///
-    /// virtual function that will be called when the user specifies is full path or an alias to this command.
-    /// if this command is ternimal then any following input tokens will be passed to this handler.
-    /// the caller provided output stream is also passed to the called command execution handler.
+    /// Virtual function that will be called when the user specifies is full path or an alias to this command.
+    /// If this command is ternimal then any following input tokens will be passed to this handler.
+    /// The caller provided output stream is also passed to the called command execution handler.
     ///
     /// @param tok token list of arguments supplied by the user.
     /// @param out text output stream for writing results to.
@@ -682,19 +706,19 @@ protected:
 ///
 struct cmd_parser_t {
 
-    /// global user data passed to new subcommands unless overridden
+    /// global user data passed to new subcommands unless overridden.
     void* user_;
 
-    /// root subcommand list
+    /// root subcommand list.
     cmd_list_t sub_;
 
-    /// user input history
+    /// user input history.
     std::vector<std::string> history_;
 
-    /// map of alias names to command instances
+    /// map of alias names to command instances.
     std::map<std::string, cmd_t*> alias_;
 
-    /// expression identifier list
+    /// expression identifier list.
     cmd_idents_t idents_;
 
     /// @brief cmd_parser_t constructor.
@@ -719,6 +743,7 @@ struct cmd_parser_t {
     /// add a new root command to the command interpreter.
     /// the new subcommand instance will be passed the global cmd_parser_t user_ data
     ///
+    /// @param type_t class derived from cmd_t base.
     /// @return instance of the newly created command.
     template <typename type_t>
     type_t* add_command()

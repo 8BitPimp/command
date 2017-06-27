@@ -1,3 +1,4 @@
+#include <array>
 #include <cassert>
 #include <limits.h>
 #include <mutex>
@@ -26,35 +27,15 @@ static bool find_matches(cmd_list_t& list,
     return vec.size() > 0;
 }
 
-// tokenize the input string
-static size_t tokenize(const char* in, cmd_tokens_t& out)
+template <typename type_t, size_t size>
+static bool in_array(const type_t& value, const std::array<type_t, size>& array)
 {
-    assert(in);
-    const char* src = in;
-    const char* start = src;
-    // step over the string
-    while (*src) {
-        // find for next white space
-        if (*src == ' ' || *src == '\t') {
-            // extract this token
-            out.push(std::string(start, src));
-            // skip trailing white space
-            for (; *src == ' ' || *src == '\t'; ++src)
-                ;
-            start = src;
-        } else {
-            ++src;
+    for (const auto& elm : array) {
+        if (elm == value) {
+            return true;
         }
     }
-    // skip any trailing tokens
-    if (src != start) {
-        // extract this token
-        out.push(std::string(start, src));
-    }
-    // flush tokens
-    out.push(std::string{});
-    // return number of tokens
-    return out.token_size();
+    return false;
 }
 
 // ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- cmd_util_t
@@ -182,7 +163,7 @@ bool cmd_parser_t::execute_imp(const std::string& expr, cmd_output_t* cmd_out)
     history_.push_back(expr);
     // tokenize command string
     cmd_tokens_t tokens(&idents_);
-    if (tokenize(expr.c_str(), tokens) == 0) {
+    if (tokens.tokenize(expr.c_str()) == 0) {
         if (!last_cmd().empty()) {
             out.println("> %s", prev_cmd.c_str());
             return execute_imp(prev_cmd, cmd_out);
@@ -194,15 +175,15 @@ bool cmd_parser_t::execute_imp(const std::string& expr, cmd_output_t* cmd_out)
     cmd_list_t* list = &sub_;
     std::vector<cmd_t*> cmd_vec;
     // check for aliases
-    cmd_t* cmd = alias_find(tokens.token_front());
+    cmd_t* cmd = alias_find(tokens.tokens.front());
     if (cmd) {
-        tokens.token_pop();
+        tokens.tokens.pop();
         list = &(cmd->sub_);
     }
-    while (!tokens.token_empty()) {
+    while (!tokens.tokens.empty()) {
         // find best matching sub command
         cmd_vec.clear();
-        find_matches(*list, tokens.token_front().c_str(), cmd_vec);
+        find_matches(*list, tokens.tokens.front().c_str(), cmd_vec);
         if (cmd_vec.size() == 0) {
             // no sub commands to match
             break;
@@ -210,7 +191,7 @@ bool cmd_parser_t::execute_imp(const std::string& expr, cmd_output_t* cmd_out)
             cmd = cmd_vec.front();
             list = &cmd->sub_;
             // remove front item
-            tokens.token_pop();
+            tokens.tokens.pop();
         } else {
             // ambiguous matches (show possible matches)
             cmd = nullptr;
@@ -226,8 +207,8 @@ bool cmd_parser_t::execute_imp(const std::string& expr, cmd_output_t* cmd_out)
         cmd_locale_t::invalid_command(out);
         return false;
     }
-    if (!tokens.token_empty()) {
-        if (tokens.token_back() == "?") {
+    if (!tokens.tokens.empty()) {
+        if (tokens.tokens.back() == "?") {
             return cmd->on_usage(out);
         }
     }
@@ -275,20 +256,21 @@ bool cmd_t::on_execute(cmd_tokens_t& tok, cmd_output_t& out)
         // an empty terminal cmd is a bit weird
         return false;
     }
-    const bool have_tokens = !tok.token_empty();
+    const bool have_tokens = !tok.tokens.empty();
     if (have_tokens) {
-        const char* tok_front = tok.token_front().c_str();
+        const char* tok_front = tok.tokens.front().c_str();
         std::vector<cmd_t*> list;
         for (const auto& i : sub_) {
-            if (cmd_util_t::levenshtein(i->name_, tok.token_front().c_str()) < FUZZYNESS) {
+            if (cmd_util_t::levenshtein(i->name_, tok.tokens.front().c_str()) < FUZZYNESS) {
                 list.push_back(i.get());
             }
         }
         cmd_locale_t::no_subcommand(out, tok_front);
         if (!list.empty()) {
             cmd_locale_t::did_you_meen(out);
+            auto indent = out.indent();
             for (cmd_t* cmd : list) {
-                out.println("    %s", cmd->name_);
+                out.println("%s", cmd->name_);
             }
         }
     } else {
@@ -366,7 +348,7 @@ void cmd_tokens_t::push(std::string input)
     /* flush when input is empty */
     if (input.empty()) {
         if (!stage_pair_.first.empty()) {
-            flags_.insert(stage_pair_.first);
+            flags.flags_.insert(stage_pair_.first);
             stage_pair_.first.clear();
         }
         return;
@@ -384,19 +366,51 @@ void cmd_tokens_t::push(std::string input)
         }
     }
     /* add to raw token set */
-    raw_.push_back(input);
+    tokens.raw_.push_back(input);
     /* if we have a flag or switch */
     if (input.find("-") == 0) {
         if (!stage_pair_.first.empty()) {
-            flags_.insert(stage_pair_.first);
+            flags.flags_.insert(stage_pair_.first);
         }
         stage_pair_.first = input;
     } else {
         if (!stage_pair_.first.empty()) {
-            pairs_[stage_pair_.first] = input;
+            pairs.pairs_[stage_pair_.first] = input;
             stage_pair_.first.clear();
         } else {
-            tokens_.push_back(input);
+            tokens.tokens_.push_back(input);
         }
     }
+}
+
+size_t cmd_tokens_t::tokenize(const char* in)
+{
+    const std::array<char, 3> whitespace = { ' ', '\r', '\t' };
+    assert(in);
+    const char* src = in;
+    const char* start = src;
+    // step over the string
+    while (*src) {
+        // find for next white space
+        if (in_array(*src, whitespace)) {
+            // extract this token
+            push(std::string(start, src));
+            // skip trailing white space
+            for (; in_array(*src, whitespace); ++src) {
+                ;
+            }
+            start = src;
+        } else {
+            ++src;
+        }
+    }
+    // skip any trailing tokens
+    if (src != start) {
+        // extract this token
+        push(std::string(start, src));
+    }
+    // flush tokens
+    push(std::string{});
+    // return number of tokens
+    return tokens.size();
 }

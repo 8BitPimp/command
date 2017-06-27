@@ -321,23 +321,170 @@ protected:
 ///
 struct cmd_tokens_t {
 
-#if 0
-    //XXX: todo
     struct {
+        /// @brief check if a flag was passed to the token list
+        ///
+        /// @return true if 'name' flag was passed as an argument
+        bool get(const std::string& name) const
+        {
+            return !(flags_.find(name) == flags_.end());
+        }
 
+        /// @brief check if the flag set is empty
+        ///
+        /// @return true if the flags set is empty, otherwise false
+        bool empty() const
+        {
+            return flags_.empty();
+        }
+
+        /// @brief command token flags
+        std::set<std::string> flags_;
     } flags;
 
     struct {
+        /// @brief retreive the argument to a passed token pair
+        ///
+        /// @return true if the pair was in the token list
+        bool get(const std::string& name, cmd_token_t& out) const
+        {
+            auto itt = pairs_.find(name);
+            if (itt == pairs_.end()) {
+                return false;
+            } else {
+                return (out = itt->second), true;
+            }
+        }
 
+        /// @brief check if the pairs map is empty
+        ///
+        /// @return true if the pairs set is empty, otherwise false
+        bool empty() const
+        {
+            return pairs_.empty();
+        }
+
+        /// @brief key value pair arguments
+        std::map<std::string, cmd_token_t> pairs_;
     } pairs;
 
     struct {
+        /// @brief return number of tokens in the token list
+        ///
+        /// @return number of tokens in the token list
+        size_t size() const
+        {
+            return tokens_.size();
+        }
 
+        /// @brief get the front most token from the token list
+        ///
+        /// @return true if the front most token could be retrived
+        bool get(std::string& out)
+        {
+            if (tokens_.empty()) {
+                return false;
+            }
+            out = tokens_.front().get();
+            tokens_.pop_front();
+            return true;
+        }
+
+        /// @brief get the front most token from the token list
+        ///
+        /// @param output to receive front most token
+        /// @return true if the front most token could be retrived
+        bool get(cmd_token_t& out)
+        {
+            if (tokens_.empty()) {
+                return false;
+            }
+            out = tokens_.front();
+            tokens_.pop_front();
+            return true;
+        }
+
+        /// @brief get the front most token from the token list as an integer
+        ///
+        /// @param output to receive the front most token
+        /// @return true if the front most token could be interpreted as integer
+        bool get(uint64_t& out)
+        {
+            if (!tokens_.empty()) {
+                if (front().get(out)) {
+                    tokens_.pop_front();
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// @brief check if the token list is empty
+        ///
+        /// @return true if the token list is empty
+        bool empty() const
+        {
+            return tokens_.empty();
+        }
+
+        /// @brief return a reference to the first token in the queue
+        ///
+        /// @return reference to first token
+        const cmd_token_t& front() const
+        {
+            return tokens_.front();
+        }
+
+        /// @brief return a reference to the last token in the queue
+        ///
+        /// @return reference to last token
+        const cmd_token_t& back() const
+        {
+            return tokens_.back();
+        }
+
+        /// @brief pop front most argument from token list
+        ///
+        /// @return true if front argument was popped
+        bool pop()
+        {
+            if (!tokens_.empty()) {
+                assert(!raw_.empty());
+                if (raw_.front() == tokens_.front()) {
+                    // pop prefixed tokens
+                    raw_.pop_front();
+                    tokens_.pop_front();
+                    return true;
+                }
+            }
+            assert(!"FIXME: failed to pop");
+            return false;
+        }
+
+        /// @brief Find a matching token in the token list
+        ///
+        /// @param in input string to try and locate in the token list
+        const bool find(const std::string& in) const
+        {
+            for (const cmd_token_t& tok : tokens_) {
+                if (tok == in) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// @brief Accessor for the tokens deque
+        std::deque<cmd_token_t>& operator()()
+        {
+            return tokens_;
+        }
+
+        /// @brief basic token arguments
+        std::deque<cmd_token_t> tokens_;
+        /// @brief raw tokens
+        std::deque<cmd_token_t> raw_;
     } tokens;
-#endif
-
-    /// @brief list of identifiers that can be substituted for tokens
-    cmd_idents_t* idents_;
 
     /// @brief constructor
     ///
@@ -347,183 +494,24 @@ struct cmd_tokens_t {
     {
     }
 
-    /// @brief return number of tokens in the token list
+    /// @brief tokenize and input stream into a cmd_tokens_t instance
     ///
-    /// @return number of tokens in the token list
-    size_t token_size() const
-    {
-        return tokens_.size();
-    }
+    /// @param in input stream to tokenize
+    /// @param out output cmd_tokens_t instance to populate
+    /// @return number of tokens parsed
+    size_t tokenize(const char* in);
 
-    /// @brief get the front most token from the token list
-    ///
-    /// @return true if the front most token could be retrived
-    bool get(std::string& out)
-    {
-        if (tokens_.empty()) {
-            return false;
-        }
-        out = tokens_.front().get();
-        tokens_.pop_front();
-        return true;
-    }
-
-    /// @brief get the front most token from the token list as an integer
-    ///
-    /// @param output to receive front most token
-    /// @return true if the front most token could be retrived as an integer
-    bool get(uint64_t& output)
-    {
-        if (tokens_.empty()) {
-            return false;
-        }
-        if (!tokens_.front().get(output)) {
-            return false;
-        }
-        tokens_.pop_front();
-        return true;
-    }
-
-    /// @brief get the front most token from the token list
-    ///
-    /// @param output to receive front most token
-    /// @return true if the front most token could be retrived
-    bool get(cmd_token_t& out)
-    {
-        if (tokens_.empty()) {
-            return false;
-        }
-        out = tokens_.front();
-        tokens_.pop_front();
-        return true;
-    }
-
-    /// @brief check if a flag was passed to the token list
-    ///
-    /// @return true if 'name' flag was passed as an argument
-    bool flag_get(const std::string& name) const
-    {
-        return !(flags_.find(name) == flags_.end());
-    }
-
-    /// @brief retreive the argument to a passed token pair
-    ///
-    /// @return true if the pair was in the token list
-    bool pair_get(const std::string& name, cmd_token_t& out) const
-    {
-        auto itt = pairs_.find(name);
-        if (itt == pairs_.end()) {
-            return false;
-        } else {
-            return (out = itt->second), true;
-        }
-    }
-
+protected:
     /// @brief push a new token into this token list
     ///
     /// @param string token to push onto list
     void push(std::string input);
 
-    /// @brief check if the token list is empty
-    ///
-    /// @return true if the token list is empty
-    bool token_empty() const
-    {
-        return tokens_.empty();
-    }
-
-    /// @brief return a reference to the first token in the queue
-    ///
-    /// @return reference to first token
-    const cmd_token_t& token_front() const
-    {
-        return tokens_.front();
-    }
-
-    /// @brief return a reference to the last token in the queue
-    ///
-    /// @return reference to last token
-    const cmd_token_t& token_back() const
-    {
-        return tokens_.back();
-    }
-
-    /// @brief pop front most argument from token list
-    ///
-    /// @return true if front argument was popped
-    bool token_pop()
-    {
-        if (!tokens_.empty()) {
-            assert(!raw_.empty());
-            if (raw_.front() == tokens_.front()) {
-                // pop prefixed tokens
-                raw_.pop_front();
-                tokens_.pop_front();
-                return true;
-            }
-        }
-        assert(!"FIXME: failed to pop");
-        return false;
-    }
-
-    /// @brief return queue of tokens
-    ///
-    /// @return queue of tokens
-    const std::deque<cmd_token_t>& tokens() const
-    {
-        return tokens_;
-    }
-
-    /// @brief return map of parameter pairs
-    ///
-    /// @return map of parameter pairs
-    const std::map<std::string, cmd_token_t>& pairs() const
-    {
-        return pairs_;
-    }
-
-    /// @brief Return a set containing all user supplied flags
-    const std::set<std::string>& flags() const
-    {
-        return flags_;
-    }
-
-    /// @brief Return a list of raw tokens pushed to the token list
-    ///
-    /// @return queue of raw tokens pushed to this token list
-    const std::deque<cmd_token_t>& raw() const
-    {
-        return raw_;
-    }
-
-    /// @brief Find a matching token in the token list
-    ///
-    /// @param in input string to try and locate in the token list
-    const bool token_find(const std::string& in) const
-    {
-        for (const cmd_token_t& tok : tokens_) {
-            if (tok == in) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-protected:
-    /// @brief raw tokens
-    std::deque<cmd_token_t> raw_;
+    /// @brief list of identifiers that can be substituted for tokens
+    cmd_idents_t* idents_;
 
     /// @brief staging area for pairs
     std::pair<std::string, cmd_token_t> stage_pair_;
-
-    /// @brief basic token arguments
-    std::deque<cmd_token_t> tokens_;
-
-    /// @brief key value pair arguments
-    std::map<std::string, cmd_token_t> pairs_;
-
-    /// @brief switch flag
-    std::set<std::string> flags_;
 };
 
 /// @brief cmd_t, the command base class.

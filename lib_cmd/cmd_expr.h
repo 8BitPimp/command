@@ -25,13 +25,13 @@ struct cmd_expr_t : public cmd_t {
             cmd_idents_t& idents = parser_.idents_;
             // parse identifier name
             std::string name;
-            if (!tok.get(name)) {
+            if (!tok.tokens.get(name)) {
                 return out.println("identifier name required"), false;
             }
             assert(!name.empty());
             // parse identifier value
             uint64_t value;
-            if (!tok.get(value)) {
+            if (!tok.tokens.get(value)) {
                 return out.println("value required"), false;
             }
             // set the identifier
@@ -54,7 +54,7 @@ struct cmd_expr_t : public cmd_t {
             cmd_idents_t& idents = parser_.idents_;
             // parse identifier name
             std::string name;
-            if (!tok.get(name)) {
+            if (!tok.tokens.get(name)) {
                 return out.println("identifier name required"), false;
             }
             assert(!name.empty());
@@ -82,7 +82,7 @@ struct cmd_expr_t : public cmd_t {
         bool join_expr(const cmd_tokens_t& tok, std::string& out) const
         {
             out.clear();
-            for (const cmd_token_t& token : tok.raw()) {
+            for (const cmd_token_t& token : tok.tokens.raw_) {
                 out.append(token.get());
                 out.append(1, ' ');
             }

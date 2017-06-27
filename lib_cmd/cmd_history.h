@@ -13,7 +13,12 @@ struct cmd_history_t : public cmd_t {
     {
         auto indent = out.indent(2);
         size_t num = parser_.history_.size();
+        num ? --num : 0;
         for (const auto& itt : parser_.history_) {
+            // dont print last thing
+            if (&itt != &parser_.history_.back()) {
+                break;
+            }
             out.println("(-%02d) %s", (uint32_t)num, itt.c_str());
             --num;
         }

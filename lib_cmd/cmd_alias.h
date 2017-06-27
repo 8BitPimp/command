@@ -11,10 +11,10 @@ struct cmd_alias_t : public cmd_t {
             desc_ = "alias a command with a single name";
         }
 
-        static cmd_t* cmd_find(const cmd_tokens_t& tokens, const cmd_list_t* list)
+        static cmd_t* cmd_find(const cmd_tokens_t& tok, const cmd_list_t* list)
         {
             cmd_t* cmd = nullptr;
-            for (const cmd_token_t& token : tokens.raw()) {
+            for (const cmd_token_t& token : tok.tokens.raw_) {
                 cmd = nullptr;
                 if (list == nullptr) {
                     return nullptr;
@@ -39,10 +39,10 @@ struct cmd_alias_t : public cmd_t {
 
         virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
         {
-            if (!tok.token_empty()) {
+            if (!tok.tokens.empty()) {
                 // pop the name token
-                cmd_token_t name = tok.token_front();
-                tok.token_pop();
+                cmd_token_t name = tok.tokens.front();
+                tok.tokens.pop();
                 // lookup a command for the remaining tokens
                 cmd_t* cmd = cmd_find(tok, &(parser_.sub_));
                 if (cmd == nullptr) {

@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <string>
 #include <vector>
+#include <array>
 
 #include "cmd_expr.h"
 
@@ -11,12 +12,12 @@ struct cmd_exp_error_t {
     bool error(const char* fmt, ...)
     {
         if (error_.empty()) {
-            char temp[1024];
+            std::array<char, 1024> temp;
             va_list ap;
             va_start(ap, fmt);
-            vsnprintf(temp, sizeof(temp), fmt, ap);
+            vsnprintf(temp.data(), temp.size(), fmt, ap);
             va_end(ap);
-            error_.push_back(temp);
+            error_.push_back(temp.data());
         }
         /* return false to make error prop easier */
         return false;
@@ -566,7 +567,7 @@ protected:
 
 bool cmd_expr_t::cmd_expr_eval_t::on_execute(cmd_tokens_t& tok, cmd_output_t& out)
 {
-    cmd_output_t::indent_t indent = out.indent_push(2);
+    auto indent = out.indent(2);
     // turn arguments into expression string
     std::string expr;
     if (!join_expr(tok, expr)) {
@@ -591,12 +592,12 @@ bool cmd_expr_t::cmd_expr_eval_t::on_execute(cmd_tokens_t& tok, cmd_output_t& ou
                 // print key value pair
                 const std::string& key = itt->first;
                 const uint64_t& value = itt->second;
-                out.println(true, "%s = 0x%llx", key.c_str(), value);
+                out.println("%s = 0x%llx", key.c_str(), value);
             }
             break;
         }
         case exp_token_t::e_value:
-            out.println(true, "0x%llx", val.value_);
+            out.println("0x%llx", val.value_);
             break;
         default:
             return cmd_locale_t::not_val_or_ident(out), false;

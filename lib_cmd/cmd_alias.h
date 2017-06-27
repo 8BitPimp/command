@@ -46,7 +46,7 @@ struct cmd_alias_t : public cmd_t {
                 // lookup a command for the remaining tokens
                 cmd_t* cmd = cmd_find(tok, &(parser_.sub_));
                 if (cmd == nullptr) {
-                    auto ident = out.indent_push(2);
+                    auto ident = out.indent(2);
                     return cmd_locale_t::unable_to_find_cmd(out, name.c_str()), false;
                 }
                 parser_.alias_add(cmd, name);
@@ -82,7 +82,7 @@ struct cmd_alias_t : public cmd_t {
 
         virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
         {
-            cmd_output_t::indent_t indent = out.indent_push(2);
+            auto indent = out.indent(2);
             cmd_locale_t::num_aliases(out, parser_.alias_.size());
             indent.add(2);
             std::string path;
@@ -90,7 +90,7 @@ struct cmd_alias_t : public cmd_t {
                 const cmd_t* cmd = itt.second;
                 path.clear();
                 cmd->get_command_path(path);
-                out.println(true, "%8s - %s", itt.first.c_str(), path.c_str());
+                out.println("%8s - %s", itt.first.c_str(), path.c_str());
             }
             return true;
         }

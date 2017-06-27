@@ -39,7 +39,7 @@ static size_t tokenize(const char* in, cmd_tokens_t& out)
             // extract this token
             out.push(std::string(start, src));
             // skip trailing white space
-            for (; *src == ' '; ++src)
+            for (; *src == ' ' || *src == '\t'; ++src)
                 ;
             start = src;
         } else {
@@ -197,43 +197,41 @@ bool cmd_parser_t::execute_imp(const std::string& expr, cmd_output_t* cmd_out)
     cmd_t* cmd = alias_find(tokens.token_front());
     if (cmd) {
         tokens.token_pop();
-    } else {
-        while (!tokens.token_empty()) {
-            // find best matching sub command
-            cmd_vec.clear();
-            find_matches(*list, tokens.token_front().c_str(), cmd_vec);
-            if (cmd_vec.size() == 0) {
-                // no sub commands to match
-                break;
-            } else if (cmd_vec.size() == 1) {
-                cmd = cmd_vec.front();
-                list = &cmd->sub_;
-                // remove front item
-                tokens.token_pop();
-            } else {
-                // ambiguous matches (show possible matches)
-                cmd = nullptr;
-                cmd_locale_t::possible_completions(out);
-                cmd_output_t::indent_t indent = out.indent_push(4);
-                for (auto c : cmd_vec) {
-                    out.println(true, "%s", c->name_);
-                }
-                break;
+        list = &(cmd->sub_);
+    }
+    while (!tokens.token_empty()) {
+        // find best matching sub command
+        cmd_vec.clear();
+        find_matches(*list, tokens.token_front().c_str(), cmd_vec);
+        if (cmd_vec.size() == 0) {
+            // no sub commands to match
+            break;
+        } else if (cmd_vec.size() == 1) {
+            cmd = cmd_vec.front();
+            list = &cmd->sub_;
+            // remove front item
+            tokens.token_pop();
+        } else {
+            // ambiguous matches (show possible matches)
+            cmd = nullptr;
+            cmd_locale_t::possible_completions(out);
+            auto indent = out.indent(4);
+            for (auto c : cmd_vec) {
+                out.println("%s", c->name_);
             }
+            break;
         }
     }
-    if (cmd) {
-        const auto& toks = tokens.tokens();
-        if (!toks.empty()) {
-            if (toks.rbegin()->get() == "?") {
-                return cmd->on_usage(out);
-            }
-        }
-        return cmd->on_execute(tokens, out);
-    } else {
+    if (!cmd) {
         cmd_locale_t::invalid_command(out);
+        return false;
     }
-    return false;
+    if (!tokens.token_empty()) {
+        if (tokens.token_back() == "?") {
+            return cmd->on_usage(out);
+        }
+    }
+    return cmd->on_execute(tokens, out);
 }
 
 bool cmd_parser_t::alias_add(cmd_t* cmd, const std::string& alias)
@@ -307,8 +305,6 @@ bool cmd_t::alias_add(const std::string& name)
 // ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- cmd_output_stdio_t
 
 struct cmd_output_stdio_t : public cmd_output_t {
-    FILE* fd_;
-    std::mutex mux_;
 
     cmd_output_stdio_t(FILE* fd)
         : fd_(fd)
@@ -318,6 +314,7 @@ struct cmd_output_stdio_t : public cmd_output_t {
 
     virtual void lock() override
     {
+
         mux_.lock();
     }
 
@@ -326,35 +323,15 @@ struct cmd_output_stdio_t : public cmd_output_t {
         mux_.unlock();
     }
 
-    virtual void indent() override
+    virtual void print(bool ind, const char* fmt, va_list& args) override
     {
-        for (uint32_t i = 0; i < indent_; ++i) {
-            fputc(' ', fd_);
-        }
-    }
-
-    virtual void print(bool ind, const char* fmt, ...) override
-    {
-        ind ? indent() : (void)0;
-        va_list args;
-        va_start(args, fmt);
+        ind ? indent_apply() : (void)0;
         vfprintf(fd_, fmt, args);
-        va_end(args);
-    }
-
-    virtual void println(bool ind, const char* fmt, ...) override
-    {
-        ind ? indent() : (void)0;
-        va_list args;
-        va_start(args, fmt);
-        vfprintf(fd_, fmt, args);
-        va_end(args);
-        eol();
     }
 
     virtual void println(bool ind, const char* fmt, va_list& args) override
     {
-        ind ? indent() : (void)0;
+        ind ? indent_apply() : (void)0;
         vfprintf(fd_, fmt, args);
         eol();
     }
@@ -363,9 +340,63 @@ struct cmd_output_stdio_t : public cmd_output_t {
     {
         fputc('\n', fd_);
     }
+
+protected:
+    FILE* fd_;
+    std::mutex mux_;
+
+    void indent_apply()
+    {
+        for (uint32_t i = 0; i < indent_; ++i) {
+            fputc(' ', fd_);
+        }
+    }
 };
 
 cmd_output_t* cmd_output_t::create_output_stdio(FILE* fd)
 {
     return new cmd_output_stdio_t(fd);
+}
+
+// ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- cmd_tokens_t
+
+void cmd_tokens_t::push(std::string input)
+{
+    const char EXP_DELIM = '$';
+    /* flush when input is empty */
+    if (input.empty()) {
+        if (!stage_pair_.first.empty()) {
+            flags_.insert(stage_pair_.first);
+            stage_pair_.first.clear();
+        }
+        return;
+    }
+    /* process identifier substitution */
+    if (idents_) {
+        if (input[0] == EXP_DELIM) {
+            const char* temp = input.c_str() + 1;
+            auto itt = idents_->find(temp);
+            if (itt != idents_->end()) {
+                const uint64_t val = itt->second;
+                // todo: convert to hex string
+                input = std::to_string(val);
+            }
+        }
+    }
+    /* add to raw token set */
+    raw_.push_back(input);
+    /* if we have a flag or switch */
+    if (input.find("-") == 0) {
+        if (!stage_pair_.first.empty()) {
+            flags_.insert(stage_pair_.first);
+        }
+        stage_pair_.first = input;
+    } else {
+        if (!stage_pair_.first.empty()) {
+            pairs_[stage_pair_.first] = input;
+            stage_pair_.first.clear();
+        } else {
+            tokens_.push_back(input);
+        }
+    }
 }

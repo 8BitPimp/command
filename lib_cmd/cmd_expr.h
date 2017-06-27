@@ -21,18 +21,18 @@ struct cmd_expr_t : public cmd_t {
 
         virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
         {
-            cmd_output_t::indent_t indent = out.indent_push(2);
+            cmd_output_t::indent_t indent = out.indent(2);
             cmd_idents_t& idents = parser_.idents_;
             // parse identifier name
             std::string name;
             if (!tok.get(name)) {
-                return out.println(true, "identifier name required"), false;
+                return out.println("identifier name required"), false;
             }
             assert(!name.empty());
             // parse identifier value
             uint64_t value;
             if (!tok.get(value)) {
-                return out.println(true, "value required"), false;
+                return out.println("value required"), false;
             }
             // set the identifier
             return (idents[name] = value), true;
@@ -50,12 +50,12 @@ struct cmd_expr_t : public cmd_t {
 
         virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
         {
-            cmd_output_t::indent_t indent = out.indent_push(2);
+            cmd_output_t::indent_t indent = out.indent(2);
             cmd_idents_t& idents = parser_.idents_;
             // parse identifier name
             std::string name;
             if (!tok.get(name)) {
-                return out.println(true, "identifier name required"), false;
+                return out.println("identifier name required"), false;
             }
             assert(!name.empty());
             // erase the identifier
@@ -63,7 +63,7 @@ struct cmd_expr_t : public cmd_t {
             if (itt != idents.end()) {
                 idents.erase(itt);
             } else {
-                out.println(true, "unable to find identifier '%s'", name.c_str());
+                out.println("unable to find identifier '%s'", name.c_str());
             }
             return true;
         }
@@ -102,12 +102,12 @@ struct cmd_expr_t : public cmd_t {
 
         virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
         {
-            cmd_output_t::indent_t indent = out.indent_push(2);
+            cmd_output_t::indent_t indent = out.indent(2);
             const cmd_idents_t& idents = parser_.idents_;
-            out.println(true, "%lld variables:", (uint64_t)idents.size());
+            out.println("%lld variables:", (uint64_t)idents.size());
             indent.add(2);
             for (const auto& itt : idents) {
-                out.println(true, "%8s 0x%llx", itt.first.c_str(), itt.second);
+                out.println("%8s 0x%llx", itt.first.c_str(), itt.second);
             }
             return true;
         }

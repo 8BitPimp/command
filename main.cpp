@@ -32,7 +32,7 @@ int main(const int argc, const char** args)
     // create output stream
     std::unique_ptr<cmd_output_t> out(cmd_output_t::create_output_stdio(stdout));
     // REPL (read-eval-print loop)
-    out->print(false, "> ");
+    out->print("> ");
     while (fgets(buffer.data(), buffer.size(), stdin)) {
         const size_t size = strnlen(buffer.data(), buffer.size());
         buffer.data()[size ? size - 1 : 0] = '\0';
@@ -42,7 +42,7 @@ int main(const int argc, const char** args)
         }
         if (!parser.execute(string, out.get())) {
         }
-        out->print(false, "> ");
+        out->print("> ");
     }
     // exit
     return 0;

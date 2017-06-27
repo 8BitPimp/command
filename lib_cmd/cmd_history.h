@@ -11,10 +11,10 @@ struct cmd_history_t : public cmd_t {
 
     virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
     {
-        cmd_output_t::indent_t indent = out.indent_push(2);
+        auto indent = out.indent(2);
         size_t num = parser_.history_.size();
         for (const auto& itt : parser_.history_) {
-            out.println(true, "(-%02d) %s", (uint32_t)num, itt.c_str());
+            out.println("(-%02d) %s", (uint32_t)num, itt.c_str());
             --num;
         }
         return true;

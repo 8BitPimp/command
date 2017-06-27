@@ -13,9 +13,9 @@ struct cmd_help_t : public cmd_t {
 
         void walk(const cmd_list_t& list, cmd_output_t& out)
         {
-            cmd_output_t::indent_t indent = out.indent_push(2);
+            auto indent = out.indent(2);
             for (const auto& cmd : list) {
-                out.println(true, cmd->name_);
+                out.println(cmd->name_);
                 assert(cmd);
                 if (!cmd->sub_.empty()) {
                     walk(cmd->sub_, out);

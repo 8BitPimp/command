@@ -623,7 +623,7 @@ struct cmd_t {
     /// @return true if the command executed successfully.
     virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out);
 
-    /// Return string with hierarchy of parent commands.
+    /// @brief Return string with hierarchy of parent commands.
     ///
     /// @param out the string to store output hierarchy.
     void get_command_path(std::string& out) const
@@ -733,8 +733,11 @@ struct cmd_parser_t {
     /// @brief Get a string with the last user input to be executed.
     ///
     /// @return reference to the last
-    const std::string& last_cmd() const
+    const std::string& last_cmd()
     {
+        if (history_.empty()) {
+            history_.push_back("hello");
+        }
         return history_.back();
     }
 

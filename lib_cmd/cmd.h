@@ -1,3 +1,9 @@
+/// @brief REPL command line parser
+///
+/// A simple but powerfull command line REPL.
+///
+/// @end
+
 #pragma once
 #include <cassert>
 #include <cstdarg>

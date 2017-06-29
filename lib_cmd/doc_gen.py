@@ -62,15 +62,20 @@ class Entry(object):
 
         # TITLE
         if self.is_class_:
-            self.write(fd, '****')
-            self.write(fd, '## {0}'.format(self.code_[0]))
-        else:
             self.write(fd, '----')
+            self.write(fd, '## {0}'.format(self.code_[0]))
+            self.eol(fd)
+        elif self.code_:
+            self.write(fd, '****')
             self.write(fd, '```c')
             for c in self.code_:
                 self.write(fd, c)
             self.write(fd, '```')
-        self.eol(fd)
+            self.eol(fd)
+        else:
+            self.write(fd, '----')
+            # prep brief to become a main title
+            fd.write('# ')
 
         # BRIEF
         if self.brief_:
@@ -123,6 +128,11 @@ def parse(fd_in, fd_out):
             entry.on_return(line)
             continue
 
+        if entry and line.startswith('/// @end'):
+            entry.emit(fd_out)
+            entry = None
+            continue
+
         if entry and line.startswith('///'):
             assert entry
             entry.on_body(line)
@@ -131,7 +141,7 @@ def parse(fd_in, fd_out):
         if line.startswith('};'):
             assert (len(entry_stack) > 0)
             entry_stack.pop()
-            pass
+            continue
 
         if entry is not None:
             entry.on_code(line)
@@ -151,4 +161,4 @@ def main(path_in, path_out):
 
 
 if __name__ == '__main__':
-    main('cmd.h', 'README.md')
+    main('cmd.h', '../README.md')

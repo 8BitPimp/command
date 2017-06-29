@@ -1,4 +1,10 @@
 ----
+# REPL command line parser
+
+A simple but powerfull command line REPL.
+
+
+****
 ```c
 typedef std::vector<std::unique_ptr<struct cmd_t>> cmd_list_t
 ```
@@ -7,7 +13,7 @@ cmd_list_t, list of cmd_t instances.
 
 
 
-----
+****
 ```c
 typedef std::map<std::string, uint64_t> cmd_idents_t
 ```
@@ -16,7 +22,7 @@ cmd_idents_t, identfier list used for cmd_tokens_t substitutions.
 
 
 
-----
+****
 ```c
 typedef void* cmd_baton_t
 ```
@@ -25,14 +31,14 @@ cmd_baton_t, baton used for passing user data to cm_t instances.
 
 
 
-****
+----
 ## struct cmd_util_t
 
 cmd_util_t, utility functions for the command parser.
 
 
 
-----
+****
 ```c
 static bool strtoll(const char* in, uint64_t& out, bool& neg)
 ```
@@ -49,7 +55,7 @@ Return:
 
 
 
-----
+****
 ```c
 static uint32_t levenshtein(const char* a, const char* b)
 ```
@@ -65,7 +71,7 @@ Return:
 
 
 
-----
+****
 ```c
 static int32_t str_match(const char* str, const char* sub)
 ```
@@ -77,7 +83,7 @@ Return:
 
 
 
-****
+----
 ## struct cmd_output_t
 
 cmd_output_t, command output interface base class.
@@ -89,7 +95,7 @@ in a range of formats. cmd_output_t is also a factory for derived classes with
 specialisations.
 
 
-----
+****
 ```c
 static cmd_output_t* create_output_stdio(FILE* fd)
 ```
@@ -104,21 +110,21 @@ Return:
 
 
 
-****
+----
 ## struct indent_t
 
 indent_t, indent control helper class.
 
 
 
-****
+----
 ## struct guard_t
 
 guard_t, output mutex helper class.
 
 
 
-----
+****
 ```c
 guard_t guard()
 ```
@@ -130,7 +136,7 @@ Return:
 
 
 
-----
+****
 ```c
 cmd_output_t()
 ```
@@ -138,7 +144,7 @@ cmd_output_t()
 constructor.
 
 
-----
+****
 ```c
 virtual ~cmd_output_t() {}
 ```
@@ -146,7 +152,7 @@ virtual ~cmd_output_t() {}
 virtual destructor.
 
 
-----
+****
 ```c
 virtual void lock() = 0
 ```
@@ -154,7 +160,7 @@ virtual void lock() = 0
 aquire the output mutex.
 
 
-----
+****
 ```c
 virtual void unlock() = 0
 ```
@@ -162,7 +168,7 @@ virtual void unlock() = 0
 release the output mutex.
 
 
-----
+****
 ```c
 indent_t indent(uint32_t next = 2)
 ```
@@ -174,7 +180,7 @@ Return:
 
 
 
-----
+****
 ```c
 template <bool INDENT = true>
 void print(const char* fmt, ...)
@@ -190,7 +196,7 @@ Params:
 print to output string without appending a new line.
 
 
-----
+****
 ```c
 template <bool INDENT = true>
 void println(const char* fmt, ...)
@@ -206,7 +212,7 @@ Params:
 print to output string and append a new line.
 
 
-----
+****
 ```c
 virtual void eol() = 0
 ```
@@ -214,7 +220,7 @@ virtual void eol() = 0
 Append an end of line character.
 
 
-----
+****
 ```c
 uint32_t indent_
 ```
@@ -222,14 +228,14 @@ uint32_t indent_
 Current indentation level.
 
 
-****
+----
 ## struct cmd_locale_t
 
 cmd_locale_t, command locale text definitions.
 
 
 
-****
+----
 ## struct cmd_token_t
 
 cmd_token_t, command arguement token.
@@ -240,7 +246,7 @@ cmd_tokens_t type.  The cmd_token_t type makes it easier to convert string
 tokens between multiple data types.
 
 
-----
+****
 ```c
 cmd_token_t() = default
 ```
@@ -248,7 +254,7 @@ cmd_token_t() = default
 constructor.
 
 
-----
+****
 ```c
 cmd_token_t(const std::string& string)
 ```
@@ -260,7 +266,7 @@ Params:
 
 
 
-----
+****
 ```c
 const std::string& get() const
 ```
@@ -272,7 +278,7 @@ Return:
 
 
 
-----
+****
 ```c
 template <typename type_t>
 bool get(type_t& out) const
@@ -288,7 +294,7 @@ Return:
 
 
 
-----
+****
 ```c
 bool operator==(const cmd_token_t& rhs) const
 ```
@@ -303,7 +309,7 @@ Return:
 
 
 
-----
+****
 ```c
 template <typename type_t>
 bool operator==(const type_t& rhs) const
@@ -319,7 +325,7 @@ Return:
 
 
 
-----
+****
 ```c
 operator std::string() const
 ```
@@ -331,7 +337,7 @@ Return:
 
 
 
-----
+****
 ```c
 const char* c_str() const
 ```
@@ -343,14 +349,14 @@ Return:
 
 
 
-****
+----
 ## struct cmd_tokens_t
 
 cmd_tokens_t, command arguments token list.
 
 
 
-----
+****
 ```c
 bool get(const std::string& name) const
 ```
@@ -362,7 +368,7 @@ Return:
 
 
 
-----
+****
 ```c
 bool empty() const
 ```
@@ -374,7 +380,7 @@ Return:
 
 
 
-----
+****
 ```c
 std::set<std::string> flags_
 ```
@@ -382,7 +388,7 @@ std::set<std::string> flags_
 command token flags.
 
 
-----
+****
 ```c
 bool get(const std::string& name, cmd_token_t& out) const
 ```
@@ -394,7 +400,7 @@ Return:
 
 
 
-----
+****
 ```c
 bool empty() const
 ```
@@ -406,7 +412,7 @@ Return:
 
 
 
-----
+****
 ```c
 std::map<std::string, cmd_token_t> pairs_
 ```
@@ -414,7 +420,7 @@ std::map<std::string, cmd_token_t> pairs_
 key value pair arguments.
 
 
-----
+****
 ```c
 size_t size() const
 ```
@@ -426,7 +432,7 @@ Return:
 
 
 
-----
+****
 ```c
 bool get(std::string& out)
 ```
@@ -438,7 +444,7 @@ Return:
 
 
 
-----
+****
 ```c
 bool get(cmd_token_t& out)
 ```
@@ -453,7 +459,7 @@ Return:
 
 
 
-----
+****
 ```c
 bool get(uint64_t& out)
 ```
@@ -468,7 +474,7 @@ Return:
 
 
 
-----
+****
 ```c
 bool empty() const
 ```
@@ -480,7 +486,7 @@ Return:
 
 
 
-----
+****
 ```c
 const cmd_token_t& front() const
 ```
@@ -492,7 +498,7 @@ Return:
 
 
 
-----
+****
 ```c
 const cmd_token_t& back() const
 ```
@@ -504,7 +510,7 @@ Return:
 
 
 
-----
+****
 ```c
 bool pop()
 ```
@@ -516,7 +522,7 @@ Return:
 
 
 
-----
+****
 ```c
 const bool find(const std::string& in) const
 ```
@@ -528,7 +534,7 @@ Params:
 
 
 
-----
+****
 ```c
 std::deque<cmd_token_t>& operator()()
 ```
@@ -536,7 +542,7 @@ std::deque<cmd_token_t>& operator()()
 Accessor for the tokens deque.
 
 
-----
+****
 ```c
 std::deque<cmd_token_t> tokens_
 ```
@@ -544,7 +550,7 @@ std::deque<cmd_token_t> tokens_
 basic token arguments.
 
 
-----
+****
 ```c
 std::deque<cmd_token_t> raw_
 ```
@@ -552,7 +558,7 @@ std::deque<cmd_token_t> raw_
 raw tokens.
 
 
-----
+****
 ```c
 cmd_tokens_t(cmd_idents_t* idents)
 ```
@@ -564,7 +570,7 @@ Params:
 
 
 
-----
+****
 ```c
 size_t tokenize(const char* in)
 ```
@@ -580,7 +586,7 @@ Return:
 
 
 
-----
+****
 ```c
 void push(std::string input)
 ```
@@ -592,7 +598,7 @@ Params:
 
 
 
-----
+****
 ```c
 cmd_idents_t* idents_
 ```
@@ -600,7 +606,7 @@ cmd_idents_t* idents_
 list of identifiers that can be substituted for tokens.
 
 
-----
+****
 ```c
 std::pair<std::string, cmd_token_t> stage_pair_
 ```
@@ -608,7 +614,7 @@ std::pair<std::string, cmd_token_t> stage_pair_
 staging area for pairs.
 
 
-****
+----
 ## struct cmd_t
 
 cmd_t, the command base class.
@@ -619,7 +625,7 @@ cmd_parser_t as a root command. two key methods can be overriden, on_execute and
 on_usage which the cmd_parser_t will invoke based on user input.
 
 
-----
+****
 ```c
 const char* const name_
 ```
@@ -627,7 +633,7 @@ const char* const name_
 command name.
 
 
-----
+****
 ```c
 struct cmd_parser_t& parser_
 ```
@@ -635,7 +641,7 @@ struct cmd_parser_t& parser_
 owning command parser.
 
 
-----
+****
 ```c
 cmd_baton_t user_
 ```
@@ -643,7 +649,7 @@ cmd_baton_t user_
 opaque user data for this command.
 
 
-----
+****
 ```c
 cmd_t* parent_
 ```
@@ -651,7 +657,7 @@ cmd_t* parent_
 the parent if this is a child command.
 
 
-----
+****
 ```c
 cmd_list_t sub_
 ```
@@ -659,7 +665,7 @@ cmd_list_t sub_
 list of child commands.
 
 
-----
+****
 ```c
 const char* usage_
 ```
@@ -667,7 +673,7 @@ const char* usage_
 command argument string.
 
 
-----
+****
 ```c
 const char* desc_
 ```
@@ -675,7 +681,7 @@ const char* desc_
 command description string.
 
 
-----
+****
 ```c
 cmd_t(const char* name,
 cmd_parser_t& parser,
@@ -692,7 +698,7 @@ Params:
 
 
 
-----
+****
 ```c
 template <typename type_t>
 type_t* add_sub_command()
@@ -707,7 +713,7 @@ instanciate and attach a new child command to this parent command supplying this
 commands user_ data during its construction.
 
 
-----
+****
 ```c
 template <typename type_t>
 type_t* add_sub_command(cmd_baton_t user)
@@ -724,7 +730,7 @@ Return:
 instanciate and attach a new child command to this parent command.
 
 
-----
+****
 ```c
 virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out)
 ```
@@ -744,7 +750,7 @@ tokens will be passed to this handler. The caller provided output stream is also
 passed to the called command execution handler.
 
 
-----
+****
 ```c
 void get_command_path(std::string& out) const
 ```
@@ -756,7 +762,7 @@ Params:
 
 
 
-----
+****
 ```c
 virtual bool on_usage(cmd_output_t& out) const
 ```
@@ -771,7 +777,7 @@ Return:
 
 
 
-----
+****
 ```c
 bool alias_add(const std::string& name)
 ```
@@ -789,7 +795,7 @@ interpretation if the first token matches any alises then the associated cmd_t
 instance will be executed.
 
 
-----
+****
 ```c
 bool error(cmd_output_t& out, const char* fmt, ...)
 ```
@@ -806,7 +812,7 @@ Return:
 
 
 
-----
+****
 ```c
 void print_cmd_list(const cmd_list_t& list, cmd_output_t& out) const
 ```
@@ -819,7 +825,7 @@ Params:
 
 
 
-----
+****
 ```c
 void print_sub_commands(cmd_output_t& out) const
 ```
@@ -831,7 +837,7 @@ Params:
 
 
 
-****
+----
 ## struct cmd_parser_t
 
 cmd_parser_t, the command parser.
@@ -842,7 +848,7 @@ commands (alias_, idents_) cmd_parser_t is responsible for parsing and
 dispatching user input to the appropriate command
 
 
-----
+****
 ```c
 cmd_parser_t(cmd_baton_t user = nullptr)
 ```
@@ -857,7 +863,7 @@ Return:
 
 
 
-----
+****
 ```c
 const std::string& last_cmd()
 ```
@@ -869,7 +875,7 @@ Return:
 
 
 
-----
+****
 ```c
 template <typename type_t>
 type_t* add_command()
@@ -887,7 +893,7 @@ add a new root command to the command interpreter. the new subcommand instance
 will be passed the global cmd_parser_t user_ data
 
 
-----
+****
 ```c
 template <typename type_t>
 type_t* add_command(cmd_baton_t user)
@@ -903,7 +909,7 @@ Return:
 
 
 
-----
+****
 ```c
 cmd_t* add_command(cmd_t*& command)
 ```
@@ -921,7 +927,7 @@ command parser.  command should not be accessed after calling this function and
 instead, the return instance should be used in its place.
 
 
-----
+****
 ```c
 bool execute(const std::string& expr, cmd_output_t* output)
 ```
@@ -937,7 +943,7 @@ Return:
 
 
 
-----
+****
 ```c
 bool alias_add(cmd_t* cmd, const std::string& alias)
 ```
@@ -953,7 +959,7 @@ Return:
 
 
 
-----
+****
 ```c
 bool alias_remove(const std::string& alias)
 ```
@@ -968,7 +974,7 @@ Return:
 
 
 
-----
+****
 ```c
 bool alias_remove(const cmd_t* cmd)
 ```
@@ -983,7 +989,7 @@ Return:
 
 
 
-----
+****
 ```c
 cmd_t* alias_find(const std::string& alias) const
 ```
@@ -998,7 +1004,7 @@ Return:
 
 
 
-----
+****
 ```c
 bool execute_imp(const std::string& expr, cmd_output_t* output)
 ```

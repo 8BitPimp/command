@@ -10,7 +10,7 @@ int main(int argc, char** args)
 
     for (test_base_t* test : test_store_t::tests) {
         assert(test);
-        printf("%08s - ", test->name);
+        printf("%16s - ", test->name);
         bool ret = test->run();
         printf("%s\n", ret ? "pass" : "fail");
         fails += ret ? 0 : 1;

@@ -26,6 +26,8 @@ struct test_store_t {
     }
 };
 
+
+
 #define CHECK(CND)        \
     {                     \
         if (!(CND))       \

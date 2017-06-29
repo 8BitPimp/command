@@ -340,6 +340,41 @@ cmd_output_t* cmd_output_t::create_output_stdio(FILE* fd)
     return new cmd_output_stdio_t(fd);
 }
 
+// ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- cmd_output_dummy_t
+
+struct cmd_output_dummy_t : public cmd_output_t {
+
+    cmd_output_dummy_t()
+        : cmd_output_t()
+    {
+    }
+
+    virtual void lock() override
+    {
+    }
+
+    virtual void unlock() override
+    {
+    }
+
+    virtual void print(bool ind, const char* fmt, va_list& args) override
+    {
+    }
+
+    virtual void println(bool ind, const char* fmt, va_list& args) override
+    {
+    }
+
+    virtual void eol() override
+    {
+    }
+};
+
+cmd_output_t* cmd_output_t::create_output_dummy()
+{
+    return new cmd_output_dummy_t;
+}
+
 // ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- cmd_tokens_t
 
 void cmd_tokens_t::push(std::string input)

@@ -69,6 +69,11 @@ struct cmd_output_t {
     /// @return cmd_output_t instance.
     static cmd_output_t* create_output_stdio(FILE* fd);
 
+    /// @bried Create a dummy cmd_output_t instance that has no side effects.
+    ///
+    /// @return cmd_output_t instance.
+    static cmd_output_t* create_output_dummy();
+
     /// @brief indent_t, indent control helper class.
     ///
     struct indent_t {

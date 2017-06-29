@@ -1,5 +1,6 @@
 #include "runner.h"
 
+namespace {
 struct cmd_test_a_t : public cmd_t {
 
     static uint32_t exec;
@@ -47,7 +48,6 @@ struct test_t : public test_base_t {
 
     virtual bool run() override
     {
-
         uint32_t& ea = cmd_test_a_t::exec;
         uint32_t& eb = cmd_test_b_t::exec;
 
@@ -60,20 +60,19 @@ struct test_t : public test_base_t {
         parser.add_command<cmd_test_b_t>();
         CHECK(ea == 1 && eb == 1);
 
-        cmd_output_t* stdio = cmd_output_t::create_output_stdio(stdout);
-        parser.execute("test", stdio);
+        cmd_output_t* output = cmd_output_t::create_output_dummy();
+        parser.execute("test", output);
         CHECK(ea == 1 && eb == 1);
 
-        parser.execute("testa", stdio);
+        parser.execute("testa", output);
         CHECK(ea == 2 && eb == 1);
 
-        parser.execute("testb", stdio);
+        parser.execute("testb", output);
         CHECK(ea == 2 && eb == 2);
 
         return true;
     }
 };
 
-namespace {
 test_t test{ "test2" };
 } // namespace {}

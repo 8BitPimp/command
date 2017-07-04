@@ -122,7 +122,10 @@ uint32_t cmd_util_t::levenshtein(const char* s1, const char* s2)
 
 // ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- cmd_parser_t
 
-bool cmd_parser_t::execute(const std::string& expr, cmd_output_t* cmd_out)
+bool cmd_parser_t::execute(
+    const std::string& expr,
+    cmd_output_t* cmd_out,
+    cmd_baton_t user)
 {
     assert(cmd_out);
     cmd_output_t& out = *cmd_out;
@@ -146,7 +149,7 @@ bool cmd_parser_t::execute(const std::string& expr, cmd_output_t* cmd_out)
         }
         // execute single command
         if (!cmd.empty()) {
-            if (!execute_imp(cmd, cmd_out)) {
+            if (!execute_imp(cmd, cmd_out, user)) {
                 return cmd_locale_t::command_failed(out, cmd.c_str()), false;
             }
         }
@@ -154,7 +157,10 @@ bool cmd_parser_t::execute(const std::string& expr, cmd_output_t* cmd_out)
     return true;
 }
 
-bool cmd_parser_t::execute_imp(const std::string& expr, cmd_output_t* cmd_out)
+bool cmd_parser_t::execute_imp(
+    const std::string& expr,
+    cmd_output_t* cmd_out,
+    cmd_baton_t user)
 {
     assert(cmd_out);
     cmd_output_t& out = *cmd_out;
@@ -166,7 +172,7 @@ bool cmd_parser_t::execute_imp(const std::string& expr, cmd_output_t* cmd_out)
     if (tokens.tokenize(expr.c_str()) == 0) {
         if (!last_cmd().empty()) {
             out.println("> %s", prev_cmd.c_str());
-            return execute_imp(prev_cmd, cmd_out);
+            return execute_imp(prev_cmd, cmd_out, user);
         } else {
             // no commands entered
             return false;
@@ -204,15 +210,20 @@ bool cmd_parser_t::execute_imp(const std::string& expr, cmd_output_t* cmd_out)
         }
     }
     if (!cmd) {
-        cmd_locale_t::invalid_command(out);
+        if (parent_) {
+            //XXX: we need to pass the entire thing to the parent ??
+        }
+//      else {
+            cmd_locale_t::invalid_command(out);
+//      }
         return false;
     }
     if (!tokens.tokens.empty()) {
         if (tokens.tokens.back() == "?") {
-            return cmd->on_usage(out);
+            return cmd->on_usage(out, user);
         }
     }
-    return cmd->on_execute(tokens, out);
+    return cmd->on_execute(tokens, out, user);
 }
 
 bool cmd_parser_t::alias_add(cmd_t* cmd, const std::string& alias)
@@ -248,8 +259,9 @@ bool cmd_parser_t::alias_remove(const cmd_t* cmd)
 
 // ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- cmd_t
 
-bool cmd_t::on_execute(cmd_tokens_t& tok, cmd_output_t& out)
+bool cmd_t::on_execute(cmd_tokens_t& tok, cmd_output_t& out, cmd_baton_t user)
 {
+    (void)user;
     static const int FUZZYNESS = 3;
     const bool have_subcomands = !sub_.empty();
     if (!have_subcomands) {

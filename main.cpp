@@ -9,8 +9,9 @@ struct cmd_exit_t : public cmd_t {
         desc_ = "exit the program";
     }
 
-    bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
+    bool on_execute(cmd_tokens_t& tok, cmd_output_t& out, cmd_baton_t user) override
     {
+        (void)user;
         exit(0);
         return false;
     }
@@ -40,7 +41,7 @@ int main(const int argc, const char** args)
         if (string.empty()) {
             break;
         }
-        if (!parser.execute(string, out.get())) {
+        if (!parser.execute(string, out.get(), nullptr)) {
         }
         out->print<false>("> ");
     }

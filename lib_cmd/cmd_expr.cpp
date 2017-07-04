@@ -565,7 +565,7 @@ protected:
     }
 }; // struct cmd_expr_imp_t
 
-bool cmd_expr_t::cmd_expr_eval_t::on_execute(cmd_tokens_t& tok, cmd_output_t& out)
+bool cmd_expr_t::cmd_expr_eval_t::on_execute(cmd_tokens_t& tok, cmd_output_t& out, cmd_baton_t user)
 {
     auto indent = out.indent(2);
     // turn arguments into expression string

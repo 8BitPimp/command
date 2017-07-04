@@ -33,10 +33,9 @@ size_t array_length(type_t (&a)[size])
 
 struct test_t : public test_base_t {
 
-    test_t(const char* name)
-        : test_base_t(name)
+    test_t()
+        : test_base_t(__FILE__)
     {
-        test_store_t::add_test(this);
     }
 
     bool do_test(const char* in, uint64_t val, bool neg) const
@@ -58,6 +57,9 @@ struct test_t : public test_base_t {
         return true;
     }
 };
-
-test_t test{ "test_strtoll" };
 } // namespace {}
+
+test_base_t* init_test_strtoll()
+{
+    return new test_t();
+}

@@ -631,8 +631,9 @@ struct cmd_t {
     ///
     /// @param tok token list of arguments supplied by the user.
     /// @param out text output stream for writing results to.
+    /// @param user user data passed to the command from cmd_parser_t::execute().
     /// @return true if the command executed successfully.
-    virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out);
+    virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out, cmd_baton_t user);
 
     /// @brief Return string with hierarchy of parent commands.
     ///
@@ -650,8 +651,9 @@ struct cmd_t {
     ///
     /// @param out output stream to print to
     /// @return true if usage was written successfully
-    virtual bool on_usage(cmd_output_t& out) const
+    virtual bool on_usage(cmd_output_t& out, cmd_baton_t user) const
     {
+        (void)user;
         cmd_output_t::indent_t indent = out.indent(2);
         std::string path;
         get_command_path(path);
@@ -717,19 +719,25 @@ protected:
 ///
 struct cmd_parser_t {
 
-    /// global user data passed to new subcommands unless overridden.
+    /// @brief global user data passed to new subcommands unless overridden.
     void* user_;
 
-    /// root subcommand list.
+    /// @brief the parent cmd_parser_t to fall back to for unknown commands.
+    ///
+    /// a hierarchy of commands can make it easier to have context sensitive
+    /// commands in a application.
+    cmd_parser_t * parent_;
+
+    /// @brief root subcommand list.
     cmd_list_t sub_;
 
-    /// user input history.
+    /// @brief user input history.
     std::vector<std::string> history_;
 
-    /// map of alias names to command instances.
+    /// @brief map of alias names to command instances.
     std::map<std::string, cmd_t*> alias_;
 
-    /// expression identifier list.
+    /// @brief expression identifier list.
     cmd_idents_t idents_;
 
     /// @brief cmd_parser_t constructor.
@@ -738,6 +746,7 @@ struct cmd_parser_t {
     /// @return user a global custom data pointer to be passed to any sub commands.
     cmd_parser_t(cmd_baton_t user = nullptr)
         : user_(user)
+        , parent_(nullptr)
     {
     }
 
@@ -799,8 +808,12 @@ struct cmd_parser_t {
     ///
     /// @param a list of ';' delimited expression strings to execute.
     /// @param output output stream that can be written to during execution.
+    /// @param additional user data to pass to command.
     /// @return true if the command executed successfully.
-    bool execute(const std::string& expr, cmd_output_t* output);
+    bool execute(
+        const std::string& expr,
+        cmd_output_t* output,
+        cmd_baton_t user);
 
     /// @brief Add a new parser alias for a cmd_t instance.
     ///
@@ -837,5 +850,8 @@ protected:
     /// @param expression string to execute.
     /// @param output output stream that can be written to during execution.
     /// @return true if the command executed successfully.
-    bool execute_imp(const std::string& expr, cmd_output_t* output);
+    bool execute_imp(
+        const std::string& expr,
+        cmd_output_t* output,
+        cmd_baton_t user);
 };

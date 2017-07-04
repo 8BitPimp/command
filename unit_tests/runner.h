@@ -1,19 +1,27 @@
+#include <cstdint>
+#include <cstring>
 #include <string>
 #include <vector>
-#include <cstdint>
 
 #include "../lib_cmd/cmd.h"
 
 struct test_base_t {
 
-    const char* const name;
+    const char* name;
 
-    test_base_t(const char* const n)
-        : name(n)
+    test_base_t(const char* n)
+        : name(__ptr_or(strrchr(n, '\\'), n))
     {
     }
 
     virtual bool run() = 0;
+
+protected:
+    template <typename type_t>
+    constexpr type_t* __ptr_or(type_t* a, type_t* b)
+    {
+        return a ? a : b;
+    }
 };
 
 struct test_store_t {
@@ -25,8 +33,6 @@ struct test_store_t {
         tests.push_back(test);
     }
 };
-
-
 
 #define CHECK(CND)        \
     {                     \

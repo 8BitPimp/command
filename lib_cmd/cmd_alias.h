@@ -37,7 +37,7 @@ struct cmd_alias_t : public cmd_t {
             return cmd;
         }
 
-        virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
+        virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out, cmd_baton_t user) override
         {
             if (!tok.tokens.empty()) {
                 // pop the name token
@@ -52,7 +52,7 @@ struct cmd_alias_t : public cmd_t {
                 parser_.alias_add(cmd, name);
                 return true;
             }
-            return on_usage(out), false;
+            return on_usage(out, user), false;
         }
     };
 
@@ -64,8 +64,9 @@ struct cmd_alias_t : public cmd_t {
             desc_ = "remove a previously registered alias";
         }
 
-        virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
+        virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out, cmd_baton_t user) override
         {
+            (void)user, (void)out;
             for (const cmd_token_t& token : tok.tokens()) {
                 parser_.alias_remove(token);
             }
@@ -80,7 +81,7 @@ struct cmd_alias_t : public cmd_t {
             desc_ = "list all registered aliases";
         }
 
-        virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
+        virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out, cmd_baton_t user) override
         {
             auto indent = out.indent(2);
             cmd_locale_t::num_aliases(out, parser_.alias_.size());

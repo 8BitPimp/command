@@ -12,8 +12,9 @@ struct cmd_test_t : public cmd_t {
         *user_ *= 7; // 7*2 = 14
     }
 
-    virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
+    virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out, cmd_baton_t user) override
     {
+        (void)user;
         *user_ *= 3; // 14*3 = 42
         return true;
     }
@@ -21,10 +22,9 @@ struct cmd_test_t : public cmd_t {
 
 struct test_t : public test_base_t {
 
-    test_t(const char* name)
-        : test_base_t(name)
+    test_t()
+        : test_base_t(__FILE__)
     {
-        test_store_t::add_test(this);
     }
 
     virtual bool run() override
@@ -33,11 +33,14 @@ struct test_t : public test_base_t {
         cmd_parser_t parser;
         parser.add_command<cmd_test_t>(&user_data);
         cmd_output_t* output = cmd_output_t::create_output_dummy();
-        bool ret = parser.execute("test", output);
+        bool ret = parser.execute("test", output, nullptr);
         CHECK(ret && (user_data == 42));
         return true;
     }
 };
-
-test_t test{ "test1" };
 } // namespace {}
+
+test_base_t* init_test_1()
+{
+    return new test_t();
+}

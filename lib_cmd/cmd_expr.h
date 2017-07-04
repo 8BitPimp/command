@@ -19,8 +19,9 @@ struct cmd_expr_t : public cmd_t {
             desc_ = "assign an identifier a value";
         }
 
-        virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
+        virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out, cmd_baton_t user) override
         {
+            (void)user;
             cmd_output_t::indent_t indent = out.indent(2);
             cmd_idents_t& idents = parser_.idents_;
             // parse identifier name
@@ -48,8 +49,9 @@ struct cmd_expr_t : public cmd_t {
             desc_ = "erase an identifier";
         }
 
-        virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
+        virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out, cmd_baton_t user) override
         {
+            (void)user;
             cmd_output_t::indent_t indent = out.indent(2);
             cmd_idents_t& idents = parser_.idents_;
             // parse identifier name
@@ -89,7 +91,7 @@ struct cmd_expr_t : public cmd_t {
             return true;
         }
 
-        virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override;
+        virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out, cmd_baton_t user) override;
     };
 
     struct cmd_expr_list_t : public cmd_t {
@@ -100,7 +102,7 @@ struct cmd_expr_t : public cmd_t {
             desc_ = "list all identifiers";
         }
 
-        virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
+        virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out, cmd_baton_t user) override
         {
             cmd_output_t::indent_t indent = out.indent(2);
             const cmd_idents_t& idents = parser_.idents_;

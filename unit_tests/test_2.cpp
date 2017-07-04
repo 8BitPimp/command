@@ -11,8 +11,9 @@ struct cmd_test_a_t : public cmd_t {
         exec = 1;
     }
 
-    virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
+    virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out, cmd_baton_t user) override
     {
+        (void)user;
         exec <<= 1;
         return true;
     }
@@ -28,8 +29,9 @@ struct cmd_test_b_t : public cmd_t {
         exec = 1;
     }
 
-    virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
+    virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out, cmd_baton_t user) override
     {
+        (void)user;
         exec <<= 1;
         return true;
     }
@@ -40,10 +42,9 @@ uint32_t cmd_test_b_t::exec;
 
 struct test_t : public test_base_t {
 
-    test_t(const char* name)
-        : test_base_t(name)
+    test_t()
+        : test_base_t(__FILE__)
     {
-        test_store_t::add_test(this);
     }
 
     virtual bool run() override
@@ -61,18 +62,21 @@ struct test_t : public test_base_t {
         CHECK(ea == 1 && eb == 1);
 
         cmd_output_t* output = cmd_output_t::create_output_dummy();
-        parser.execute("test", output);
+        parser.execute("test", output, nullptr);
         CHECK(ea == 1 && eb == 1);
 
-        parser.execute("testa", output);
+        parser.execute("testa", output, nullptr);
         CHECK(ea == 2 && eb == 1);
 
-        parser.execute("testb", output);
+        parser.execute("testb", output, nullptr);
         CHECK(ea == 2 && eb == 2);
 
         return true;
     }
 };
-
-test_t test{ "test2" };
 } // namespace {}
+
+test_base_t* init_test_2()
+{
+    return new test_t();
+}

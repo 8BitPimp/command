@@ -9,8 +9,9 @@ struct cmd_history_t : public cmd_t {
         desc_ = "show all previously executed commands";
     }
 
-    virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
+    virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out, cmd_baton_t user) override
     {
+        (void)user;
         auto indent = out.indent(2);
         size_t num = parser_.history_.size();
         num ? --num : 0;

@@ -10,7 +10,7 @@ struct cmd_echo_t : public cmd_t {
         desc_ = "echo cmd_t args for debugging";
     }
 
-    virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
+    virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out, cmd_baton_t user) override
     {
         auto indent = out.indent(2);
         if (!tok.tokens.empty()) {

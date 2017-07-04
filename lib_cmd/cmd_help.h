@@ -23,8 +23,9 @@ struct cmd_help_t : public cmd_t {
             }
         }
 
-        virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
+        virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out, cmd_baton_t user) override
         {
+            (void)user;
             walk(parser_.sub_, out);
             return true;
         }
@@ -37,8 +38,9 @@ struct cmd_help_t : public cmd_t {
         add_sub_command<cmd_help_tree_t>();
     }
 
-    virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out) override
+    virtual bool on_execute(cmd_tokens_t& tok, cmd_output_t& out, cmd_baton_t user) override
     {
+        (void)user;
         print_cmd_list(parser_.sub_, out);
         return true;
     }
